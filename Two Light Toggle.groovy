@@ -117,7 +117,7 @@ void twoColorToggle(evt) {
 			if (secRandom) {
 				Long time = now()
 				Integer hueRnd = (time % 100) + 1
-				Integer satRnd = (time % 25) + 1
+				Integer satRnd = (time % 30) + 1
 				secColor = ["hue": hueRnd, "saturation": 100 - satRnd, "level": 50]
 			} else {
 				secColor = secTempToggle ? evaluate(secTemp) : evaluate(secColor)
