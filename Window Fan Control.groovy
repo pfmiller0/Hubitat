@@ -30,6 +30,9 @@ definition(
 )
 
 preferences {
+	section() {
+		input "isPaused", "bool", title: "Pause app", defaultValue: false
+	}
 	section("Temperature control") {
 		input "tempTargetCooling", "number", title: "Target temperature (Cooling)", defaultValue: 69
 		input "tempTargetHeating", "number", title: "Target temperature (Heating)", defaultValue: 71
@@ -68,19 +71,21 @@ void updated() {
 }
 
 void initialize() {
-	state.timeLastChange = state.timeLastChange ? state.timeLastChange : 0
-	state.tempModeActive = state.tempModeActive ? state.tempModeActive : "Cooling"
+	if (isPaused == false) {
+		state.timeLastChange = state.timeLastChange ? state.timeLastChange : 0
+		state.tempModeActive = state.tempModeActive ? state.tempModeActive : "Cooling"
 
-	subscribe(thermoOut, "temperature", temperatureHandler)
-	subscribe(thermoIn, "temperature", temperatureHandler)
+		subscribe(thermoOut, "temperature", temperatureHandler)
+		subscribe(thermoIn, "temperature", temperatureHandler)
 
-	subscribe(windowControl, "contact.closed", temperatureHandler)
-	subscribe(windowControl, "contact.open", openedWindow)
-	subscribe(switchControl, "switch.on", temperatureHandler)
-	subscribe(switchControl, "switch.off", thermostateOffHandler)
-	subscribe(switchFans, "switch", fanChange)
-    
-	temperatureHandler()
+		subscribe(windowControl, "contact.closed", temperatureHandler)
+		subscribe(windowControl, "contact.open", openedWindow)
+		subscribe(switchControl, "switch.on", temperatureHandler)
+		subscribe(switchControl, "switch.off", thermostateOffHandler)
+		subscribe(switchFans, "switch", fanChange)
+
+		temperatureHandler()
+	}
 }
 
 void openedWindow(evt) {
