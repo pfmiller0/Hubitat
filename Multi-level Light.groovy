@@ -16,7 +16,7 @@ definition(
 
 preferences {
 	section() {
-		input "isPaused", "bool", title: "Pause app"
+		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
     section("Devices") {
     	input "light", "capability.colorTemperature", title: "Light", multiple: false
