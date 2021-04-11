@@ -16,7 +16,7 @@ definition(
 
 preferences {
 	section() {
-		input "isPaused", "bool", title: "Pause app"
+		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
     section("Settings") {
     	input "devNotify", "capability.notification", title: "Notification device", multiple: false, required: false
