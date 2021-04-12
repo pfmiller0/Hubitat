@@ -3,10 +3,11 @@
  *
  *  Copyright 2020 Peter Miller
  *
- *  2021-02-07: Switched to asynhttpget. Added tracking of updated incidents
+ * 2021-04-11: Switched logging to event log. Cleaned up incident list and variable names.
+ * 2021-02-07: Switched to asynhttpget. Added tracking of updated incidents
  */
 definition(
-    name: "SDFD Incident Notifier",
+    name: "SDFD Incident Notifier (test)",
     namespace: "hyposphere.net",
     author: "Peter Miller",
     description: "Retrieve SDFD incidents, and provide notification for local incidents.",
@@ -18,8 +19,9 @@ preferences {
 	section() {
 		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
-    section("Settings") {
-    	input "devNotify", "capability.notification", title: "Notification device", multiple: false, required: false
+	section("Settings") {
+		input "updateTime", "number", title: "Update frequency (mins)", defaultValue: 5
+		input "devNotify", "capability.notification", title: "Notification device", multiple: false, required: false
 	}
 	section("Debug") {
 		input "debugMode", "bool", title: "Enable debug logging", defaultValue: false
@@ -29,12 +31,8 @@ preferences {
 
 List<String> IGNORE_INC() { ["Medical", "Medical Alert Alarm", "Logistics", "Facilities", "Duty Mechanic", "Carbon Monoxide Alarm", "Move Up", "CAD Test", "Ringing Alarm", "Elevator Rescue", "Lock in/out", "DMS", "Special Service"] }
 List<String> REDUNDANT_TYPES() { ["Traffic Accidents", "Single Resource", "Single Engine Response", "Advised Incident (misc.)", "Structure Commercial", "Traffic Accident Freeway (NC)", "Nat Gas SING ENG SDGE", "Vehicle vs. Structure"] }
+//List<String> NO_NOTIFICATION_TYPES() { ["Vehicle fire freeway", "Ringing alarm highrise", "Traffic Accident FWY", "Extinguished fire", "Page"] }
 List<String> AMBULANCE_UNITS() { ["M", "AM", "BLS", "Sdge"] }
-
-//@Field static List<String> IGNORE_INC = ["Medical", "Medical Alert Alarm", "Logistics", "Facilities", "Duty Mechanic", "Carbon Monoxide Alarm", "Move Up", "CAD Test", "Ringing Alarm", "Elevator Rescue", "Lock in/out", "DMS", "Special Service"]
-//@Field static List<String> REDUNDANT_TYPES = ["Traffic Accidents", "Single Resource", "Single Engine Response", "Advised Incident (misc.)", "Structure Commercial", "Traffic Accident Freeway (NC)", "Nat Gas SING ENG SDGE", "Vehicle vs. Structure"]
-//@Field static List<String> AMBULANCE_UNITS = ["M", "AM", "BLS"]
-
 	
 void installed() {
 	if (debugMode) log.debug "Installed with settings: ${settings}"
@@ -55,14 +53,14 @@ void updated() {
 void initialize() {
 	if (isPaused == false) {
 		if (debugMode) {
-			state.prevMasterIN = "AA00000000"
+			state.prevIncNum = "AA00000000"
 			state.activeIncidents = []
 		} else {
-			state.prevMasterIN = state.prevMasterIN ? state.prevMasterIN : "AA00000000"
+			state.prevIncNum = state.prevIncNum ? state.prevIncNum : state.prevMasterIN; state.remove("prevMasterIN")
+			state.prevIncNum = state.prevIncNum ? state.prevIncNum : "AA00000000"
 		}
 
-		// run every 5 minutes
-		schedule('0 */5 * ? * *', incidentCheck)
+		schedule('0 */' + updateTime + ' * ? * *', incidentCheck)
 	}
 }
 
@@ -97,17 +95,17 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	List<Map> otherIncidents = []
 	List<Map> activeIncidents = []
 	List<Map> updatedActiveIncidents = []
-	String newMaxMasterIN = ""
+	String newMaxIncNum = ""
 
 	if (resp.getStatus() != 200 ) {
 		log.debug "HTTP error: " + resp.getStatus()
 		return
 	}
 
-	allIncidents = filterIncidentType(resp.getJson(), IGNORE_INC())
+	allIncidents = filterIncidentType(cleanupList(resp.getJson()), IGNORE_INC())
 	allIncidents = filterOnlyMedUnits(allIncidents, AMBULANCE_UNITS())
-	fsIncidents = allIncidents.findAll { it.MasterIncidentNumber.substring(0, 2) == "FS" }
-	otherIncidents = allIncidents.findAll { it.MasterIncidentNumber.substring(0, 2) != "FS" }
+	fsIncidents = allIncidents.findAll { it.IncidentNumber.substring(0, 2) == "FS" }
+	otherIncidents = allIncidents.findAll { it.IncidentNumber.substring(0, 2) != "FS" }
 	activeIncidents = state.activeIncidents ? state.activeIncidents : []
 	updatedActiveIncidents = []
 	
@@ -116,23 +114,23 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	updatedActiveIncidents = getUpdatedActiveIncidents(allIncidents, activeIncidents)
 	// Update active incidents with new data
 	updatedActiveIncidents.each { cur ->
-		activeIncidents[activeIncidents.findIndexOf { it.MasterIncidentNumber == cur.MasterIncidentNumber }].putAll(cur)
+		activeIncidents[activeIncidents.findIndexOf { it.IncidentNumber == cur.IncidentNumber }].putAll(cur)
 	}
 	
-	if (updatedActiveIncidents != []) log.info "SDFD Updated Incidents:\n" + incidentsToStr(updatedActiveIncidents, "updated")
+	if (updatedActiveIncidents != []) logIncidents(updatedActiveIncidents, true)
 	
 	fsIncidents = newIncidents(fsIncidents)
 	if (fsIncidents != []) {
-		newMaxMasterIN = fsIncidents*.MasterIncidentNumber.max()
-		activeIncidents.addAll(getActiveList(fsIncidents))
+		newMaxIncNum = fsIncidents*.IncidentNumber.max()
+		activeIncidents.addAll(fsIncidents)
 		
-		log.info "SDFD Incidents:\n" + incidentsToStr(fsIncidents + otherIncidents, "full")
+		logIncidents(fsIncidents + otherIncidents, false)
 		fsIncidents = localIncidents("E5", fsIncidents)
 		
 		if (fsIncidents != []) devNotify.deviceNotification incidentsToStr(fsIncidents, "min")
 		
-		if (newMaxMasterIN > state.prevMasterIN) {
-			state.prevMasterIN = newMaxMasterIN
+		if (newMaxIncNum > state.prevIncNum) {
+			state.prevIncNum = newMaxIncNum
 		}	
 	}
 	
@@ -146,11 +144,11 @@ List<Map> filterIncidentType(List<Map> incidents, List<String> types) {
 List<Map> filterOnlyMedUnits(List<Map> incidents, List<String> medUnits) {	
 	// TODO: Rewrite to use medUnits list
 	
-	return incidents.findAll { inc -> !inc.Units.every {it.Code =~ '^M[0-9]+$' || it.Code =~ '^AM[0-9]+$' || it.Code =~ '^BLS[0-9]+$' } }
+	return incidents.findAll { inc -> !inc.Units.every {it =~ '^M[0-9]+$' || it =~ '^AM[0-9]+$' || it =~ '^BLS[0-9]+$' } }
 }
 
 boolean unitCalled(Map<String, List> incident, String unit) {
-	return incident.Units.any { it.Code == unit }
+	return incident.Units.any { it == unit }
 }
 
 List<Map> localIncidents(String localUnit, List<Map> incidents) {
@@ -158,45 +156,75 @@ List<Map> localIncidents(String localUnit, List<Map> incidents) {
 }
 
 List<Map> newIncidents(List<Map> incidents) {	
-	return incidents.findAll { it.MasterIncidentNumber.substring(2) > state.prevMasterIN.substring(2) }
+	return incidents.findAll { it.IncidentNumber.substring(2) > state.prevIncNum.substring(2) }
 }
 
-List<Map> getActiveList(List<Map> incidents) {
-	List<Map> activeInc = []
+List<Map> cleanupList(List<Map> incidents) {
+	List<Map> cleanInc = []
 	
 	incidents.each { inc ->
-		activeInc << [MasterIncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate, CallType: inc.CallType, Address: inc.Address, CrossStreet: inc.CrossStreet, Units: inc.Units*.Code]
+		cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate, CallType: inc.CallType, IncidentTypeName: inc.IncidentTypeName, Address: inc.Address, CrossStreet: inc.CrossStreet, Units: inc.Units*.Code]
 	}
 	
-	return activeInc
+	return cleanInc
 }
+
 
 List<Map> getUpdatedActiveIncidents(List<Map> allIncidents, List<Map> activeIncidents) {
 	List<Map> updatedInc = []
 	Map prev = null
 	
 	allIncidents.each { cur ->
-		prev = activeIncidents.find { it.MasterIncidentNumber == cur.MasterIncidentNumber }
-		if (prev && (cur.CallType != prev.CallType || cur.Units*.Code != prev.Units)) {
-			updatedInc << [MasterIncidentNumber: cur.MasterIncidentNumber, ResponseDate: cur.ResponseDate, CallType: cur.CallType, Address: cur.Address, CrossStreet: cur.CrossStreet, Units: cur.Units*.Code]
+		prev = activeIncidents.find { it.IncidentNumber == cur.IncidentNumber }
+		if (prev && (cur.CallType != prev.CallType || cur.Units != prev.Units)) {
+			//updatedInc << [IncidentNumber: cur.MasterIncidentNumber, ResponseDate: cur.ResponseDate, CallType: cur.CallType, IncidentTypeName: cur.IncidentTypeName, Address: cur.Address, CrossStreet: cur.CrossStreet, Units: cur.Units]
+			updatedInc << cur
 		}
 	}
 	//log.debug "Updated list: " + updatedInc
 	return updatedInc
 }
 
+
 List<Map> removeResolvedIncidents(List<Map> allIncidents, List<Map> activeIncidents) {
 	return activeIncidents.findAll { inc ->
-		allIncidents.any { it.MasterIncidentNumber == inc.MasterIncidentNumber }
+		allIncidents.any { it.IncidentNumber == inc.IncidentNumber }
 	}
 }
 
+void logIncidents(List<Map> incidents, boolean isUpdated) {
+	List<String> listIgnoreTypes = REDUNDANT_TYPES()
+	java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
+	String IncidentType = ""
+	String CrossStreet = ""
+	String incDesc = ""
+	String incTime = ""
+	
+	incidents.each { inc ->
+		IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : " [$inc.IncidentTypeName]"
+		CrossStreet = inc.CrossStreet ? "|$inc.CrossStreet" : ""
+		if (isUpdated) {
+			incTime = "UPDATED"
+		} else {
+			incTime = df.format(toDateTime(inc.ResponseDate))
+		}
+		
+		incDesc = "${inc.Address}${CrossStreet}:"
+		inc.Units.each {
+			incDesc = incDesc + " $it"
+		}
+
+		sendEvent(name: "${inc.CallType}${IncidentType}", value: "$inc.IncidentNumber ($incTime)", descriptionText: incDesc) 
+	}
+}
+
+/*
 String incidentToStr(Map<String, List> inc, String format) {
     List<String> listIgnoreTypes = REDUNDANT_TYPES()
 	String out = ""
 	String CrossStreet = inc.CrossStreet ? "|$inc.CrossStreet" : ""
-    String IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "-" : "[$inc.IncidentTypeName]"
-	String incNum = debugMode ? " ($inc.MasterIncidentNumber)" : ""
+	String IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "-" : "[$inc.IncidentTypeName]"
+	String incNum = debugMode ? " ($inc.IncidentNumber)" : ""
 	
 	if (format == "full") {
 		java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
@@ -204,16 +232,11 @@ String incidentToStr(Map<String, List> inc, String format) {
 	} else if (format == "min") {
 		out = "$inc.CallType - $inc.Address$CrossStreet:"
 	} else if (format == "updated") {
-		// Updated incidents list has a flattened units list, so just append and return
 		out = "UPDATED" + incNum + " $inc.CallType - $inc.Address$CrossStreet:"
-		inc.Units.each {
-			out = out + " $it"
-		}
-		return out
 	}
 		
 	inc.Units.each {
-		out = out + " $it.Code"
+		out = out + " $it"
 	}
 	
 	return out
@@ -228,3 +251,4 @@ String incidentsToStr(List<Map> incidents, String format) {
 	
 	return out
 }
+*/
