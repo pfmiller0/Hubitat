@@ -7,7 +7,7 @@
  * 2021-02-07: Switched to asynhttpget. Added tracking of updated incidents
  */
 definition(
-    name: "SDFD Incident Notifier (test)",
+    name: "SDFD Incident Notifier",
     namespace: "hyposphere.net",
     author: "Peter Miller",
     description: "Retrieve SDFD incidents, and provide notification for local incidents.",
