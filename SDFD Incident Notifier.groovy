@@ -56,7 +56,6 @@ void initialize() {
 			state.prevIncNum = "AA00000000"
 			state.activeIncidents = []
 		} else {
-			state.prevIncNum = state.prevIncNum ? state.prevIncNum : state.prevMasterIN; state.remove("prevMasterIN")
 			state.prevIncNum = state.prevIncNum ? state.prevIncNum : "AA00000000"
 		}
 
