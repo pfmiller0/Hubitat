@@ -217,7 +217,6 @@ void logIncidents(List<Map> incidents, boolean isUpdated) {
 	}
 }
 
-/*
 String incidentToStr(Map<String, List> inc, String format) {
     List<String> listIgnoreTypes = REDUNDANT_TYPES()
 	String out = ""
@@ -250,4 +249,3 @@ String incidentsToStr(List<Map> incidents, String format) {
 	
 	return out
 }
-*/
