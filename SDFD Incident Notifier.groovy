@@ -201,14 +201,14 @@ void logIncidents(List<Map> incidents, boolean isUpdated) {
 	
 	incidents.each { inc ->
 		IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : " [$inc.IncidentTypeName]"
-		CrossStreet = inc.CrossStreet ? "|$inc.CrossStreet" : ""
+		CrossStreet = inc.CrossStreet ? " | $inc.CrossStreet" : ""
 		if (isUpdated) {
 			incTime = "UPDATED"
 		} else {
 			incTime = df.format(toDateTime(inc.ResponseDate))
 		}
 		
-		incDesc = "${inc.Address}${CrossStreet}:"
+		incDesc = "${inc.Address}${CrossStreet}:\n"
 		inc.Units.each {
 			incDesc = incDesc + " $it"
 		}
