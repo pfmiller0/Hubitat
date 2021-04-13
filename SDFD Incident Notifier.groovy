@@ -193,7 +193,7 @@ List<Map> removeResolvedIncidents(List<Map> allIncidents, List<Map> activeIncide
 
 void logIncidents(List<Map> incidents, boolean isUpdated) {
 	List<String> listIgnoreTypes = REDUNDANT_TYPES()
-	java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
+	java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm");
 	String IncidentType = ""
 	String CrossStreet = ""
 	String incDesc = ""
@@ -205,7 +205,7 @@ void logIncidents(List<Map> incidents, boolean isUpdated) {
 		if (isUpdated) {
 			incTime = "UPDATED"
 		} else {
-			incTime = df.format(toDateTime(inc.ResponseDate))
+			incTime = "REC: " + df.format(toDateTime(inc.ResponseDate))
 		}
 		
 		incDesc = "${inc.Address}${CrossStreet}:\n"
