@@ -103,7 +103,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	}
 
 	allIncidents = filterIncidentType(cleanupList(resp.getJson()), IGNORE_INC())
-	allIncidents = filterOnlyMedUnits(allIncidents, AMBULANCE_UNITS())
+	allIncidents = filterMedIncidents(allIncidents, AMBULANCE_UNITS())
 	fsIncidents = allIncidents.findAll { it.IncidentNumber.substring(0, 2) == "FS" }
 	otherIncidents = allIncidents.findAll { it.IncidentNumber.substring(0, 2) != "FS" }
 	activeIncidents = state.activeIncidents ? state.activeIncidents : []
@@ -141,10 +141,13 @@ List<Map> filterIncidentType(List<Map> incidents, List<String> types) {
 	return incidents.findAll { inc -> types.every {type -> type != inc.CallType} }
 }
 
-List<Map> filterOnlyMedUnits(List<Map> incidents, List<String> medUnits) {	
-	// TODO: Rewrite to use medUnits list
+List<Map> filterMedIncidents(List<Map> incidents, List<String> medUnits) {	
+	// TODO: Rewrite to use AMBULANCE_UNITS list
+	String unit_regexp = ""
+	AMBULANCE_UNITS().every { unit_regexp = unit_regexp + "|" + it }
 	
-	return incidents.findAll { inc -> !inc.Units.every {it =~ '^M[0-9]+$' || it =~ '^AM[0-9]+$' || it =~ '^BLS[0-9]+$' } }
+	return incidents.findAll { inc -> !inc.Units.every {it =~ '(^M[0-9]+$)|(^AM[0-9]+$)|(^BLS[0-9]+$)' } }
+	//return incidents.findAll { inc -> !inc.Units.every {it =~ '^M[0-9]+$' || it =~ '^AM[0-9]+$' || it =~ '^BLS[0-9]+$' } }
 }
 
 boolean unitCalled(Map<String, List> incident, String unit) {
