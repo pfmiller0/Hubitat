@@ -21,7 +21,7 @@ preferences {
 	}
 	section("Settings") {
 		input "updateTime", "number", title: "Update frequency (mins)", defaultValue: 5
-		input "notifyUnits" "string", title: "Notification unit"
+		input "notifyUnits", "string", title: "Notification unit"
 		input "notifyDevice", "capability.notification", title: "Notification device", multiple: false, required: false
 	}
 	section("Debug") {
