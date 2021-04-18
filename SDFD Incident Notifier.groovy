@@ -21,7 +21,8 @@ preferences {
 	}
 	section("Settings") {
 		input "updateTime", "number", title: "Update frequency (mins)", defaultValue: 5
-		input "devNotify", "capability.notification", title: "Notification device", multiple: false, required: false
+		input "notifyUnits" "string", title: "Notification unit"
+		input "notifyDevice", "capability.notification", title: "Notification device", multiple: false, required: false
 	}
 	section("Debug") {
 		input "debugMode", "bool", title: "Enable debug logging", defaultValue: false
@@ -124,9 +125,9 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		activeIncidents.addAll(fsIncidents)
 		
 		logIncidents(fsIncidents + otherIncidents, false)
-		fsIncidents = localIncidents("E5", fsIncidents)
+		fsIncidents = localIncidents(notifyUnits, fsIncidents)
 		
-		if (fsIncidents != []) devNotify.deviceNotification incidentsToStr(fsIncidents, "min")
+		if (fsIncidents != []) notifyDevice.deviceNotification incidentsToStr(fsIncidents, "min")
 		
 		if (newMaxIncNum > state.prevIncNum) {
 			state.prevIncNum = newMaxIncNum
