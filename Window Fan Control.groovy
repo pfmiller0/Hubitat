@@ -103,7 +103,7 @@ void openedWindow(evt) {
 		logInfo "Thermostat is disabled, ignoring window"
 	} else {
 		changeFanState("off", "Windows has been opened. Turning off fan")
-		app.updateLabel(app.getLabel + " <span style='color:red'>Window open</span>")
+		app.updateLabel(app.getLabel() + " <span style='color:red'>Window open</span>")
 	}
 }
 
