@@ -90,7 +90,7 @@ void initialize() {
 
 void resetAppLabel() {
 	String label = app.getLabel()
-	Matcher m = label =~ / <.*/
+	java.util.regex.Matcher m = label =~ / <.*/
 	
 	if (m) {
 		label = label.substring(0, m.start())
