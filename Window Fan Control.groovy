@@ -84,7 +84,11 @@ void initialize() {
 		subscribe(switchControl, "switch.off", thermostateOffHandler)
 		subscribe(switchFans, "switch", fanChange)
 
+		resetApplabel()
+		
 		temperatureHandler()
+	} else {
+		addAppLabel("Paused", "red")
 	}
 }
 
@@ -103,7 +107,6 @@ void addAppLabel(String labelNote, String color) {
 	resetAppLabel()
 	
 	app.updateLabel(app.getLabel() + labelTag)
-	
 }
 
 void openedWindow(evt) {
@@ -111,7 +114,7 @@ void openedWindow(evt) {
 		logInfo "Thermostat is disabled, ignoring window"
 	} else {
 		changeFanState("off", "Windows has been opened. Turning off fan")
-		addAppLabel("Windows open", "red")
+		addAppLabel("Window open", "red")
 	}
 }
 
