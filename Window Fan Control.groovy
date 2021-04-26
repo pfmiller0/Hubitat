@@ -98,12 +98,20 @@ void resetAppLabel() {
 	}
 }
 
+void addAppLabel(String labelNote, String color) {
+	String labelTag = " <span style='color:" + color + "'>" + labelNote + "</span>"
+	resetAppLabel()
+	
+	app.updateLabel(app.getLabel() + labelTag)
+	
+}
+
 void openedWindow(evt) {
 	if (switchControl != null && switchControl.latestValue("switch") == "off") {
 		logInfo "Thermostat is disabled, ignoring window"
 	} else {
 		changeFanState("off", "Windows has been opened. Turning off fan")
-		app.updateLabel(app.getLabel() + " <span style='color:red'>Window open</span>")
+		addAppLabel("Windows open", "red")
 	}
 }
 
