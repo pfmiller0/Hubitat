@@ -83,12 +83,8 @@ void initialize() {
 		subscribe(switchControl, "switch.on", temperatureHandler)
 		subscribe(switchControl, "switch.off", thermostateOffHandler)
 		subscribe(switchFans, "switch", fanChange)
-
-		resetAppLabel()
 		
 		temperatureHandler()
-	} else {
-		addAppLabel("Paused", "red")
 	}
 }
 
