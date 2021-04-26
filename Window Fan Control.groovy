@@ -78,7 +78,7 @@ void initialize() {
 		subscribe(thermoOut, "temperature", temperatureHandler)
 		subscribe(thermoIn, "temperature", temperatureHandler)
 
-		subscribe(windowControl, "contact.closed", temperatureHandler)
+		subscribe(windowControl, "contact.closed", closedWindow)
 		subscribe(windowControl, "contact.open", openedWindow)
 		subscribe(switchControl, "switch.on", temperatureHandler)
 		subscribe(switchControl, "switch.off", thermostateOffHandler)
@@ -88,12 +88,28 @@ void initialize() {
 	}
 }
 
+void resetAppLabel() {
+	String label = app.getLabel()
+	Matcher m = label =~ / <.*/
+	
+	if (m) {
+		label = label.substring(0, m.start())
+		app.updateLabel(label.substring(0, m.start()))
+	}
+}
+
 void openedWindow(evt) {
 	if (switchControl != null && switchControl.latestValue("switch") == "off") {
 		logInfo "Thermostat is disabled, ignoring window"
 	} else {
 		changeFanState("off", "Windows has been opened. Turning off fan")
+		app.updateLabel(app.getLabel + " <span style='color:red'>Window open</span>")
 	}
+}
+
+void closedWindow(evt) {
+	resetAppLabel()
+	temperatureHandler(evt)
 }
 
 void thermostateOffHandler(evt) {
