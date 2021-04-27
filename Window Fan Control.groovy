@@ -30,6 +30,9 @@ definition(
 )
 
 preferences {
+	// Remove app label before displaying label text in settings
+	resetAppLabel()
+
 	section() {
 		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
@@ -72,9 +75,11 @@ void updated() {
 
 void initialize() {
 	if (isPaused == false) {
+		resetAppLabel()
+
 		state.timeLastChange = state.timeLastChange ? state.timeLastChange : 0
 		state.tempModeActive = state.tempModeActive ? state.tempModeActive : "Cooling"
-
+		
 		subscribe(thermoOut, "temperature", temperatureHandler)
 		subscribe(thermoIn, "temperature", temperatureHandler)
 
@@ -85,6 +90,8 @@ void initialize() {
 		subscribe(switchFans, "switch", fanChange)
 		
 		temperatureHandler()
+	} else {
+		addAppLabel("Paused", "red")
 	}
 }
 
