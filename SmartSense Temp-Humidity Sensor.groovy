@@ -13,18 +13,17 @@
  *  for the specific language governing permissions and limitations under the License.
  *
  */
-import physicalgraph.zigbee.zcl.DataType
+import hubitat.zigbee.zcl.DataType
 
 metadata {
-	definition(name: "SmartSense Temp/Humidity Sensor", namespace: "smartthings", author: "SmartThings", runLocally: true, minHubCoreVersion: '000.017.0012', executeCommandsLocally: false, ocfDeviceType: "oic.d.thermostat") {
+	definition(name: "SmartSense Temp/Humidity Sensor", namespace: "smartthings", author: "SmartThings") {
 		capability "Configuration"
 		capability "Battery"
 		capability "Refresh"
 		capability "Temperature Measurement"
 		capability "Relative Humidity Measurement"
-		capability "Health Check"
+		//capability "Health Check"
 		capability "Sensor"
-
 
 		fingerprint profileId: "0104", inClusters: "0001,0003,0020,0402,0B05,FC45", outClusters: "0019,0003", manufacturer: "CentraLite", model: "3310-S", deviceJoinName: "Multipurpose Sensor"
 		fingerprint profileId: "0104", inClusters: "0001,0003,0020,0402,0B05,FC45", outClusters: "0019,0003", manufacturer: "CentraLite", model: "3310-G", deviceJoinName: "Centralite Multipurpose Sensor" //Centralite Temp & Humidity Sensor
@@ -34,53 +33,19 @@ metadata {
 		fingerprint profileId: "0104",  inClusters: "0000, 0001, 0003, 0009, 0402", manufacturer: "HEIMAN", model: "HT-EM", deviceJoinName: "HEIMAN Multipurpose Sensor" //HEIMAN Temperature & Humidity Sensor
 		fingerprint profileId: "0104",  inClusters: "0000, 0001, 0003, 0402, 0B05", manufacturer: "HEIMAN", model: "HT-EF-3.0", deviceJoinName: "HEIMAN Multipurpose Sensor" //HEIMAN Temperature & Humidity Sensor
 		fingerprint profileId: "0104", deviceId: "0302", inClusters: "0000,0001,0003,0020,0402,0405", outClusters: "0003,000A,0019", manufacturer: "frient A/S", model :"HMSZB-110", deviceJoinName: "frient Multipurpose Sensor" // frient Humidity Sensor
-	}
-
-	simulator {
-		status 'H 40': 'catchall: 0104 FC45 01 01 0140 00 D9B9 00 04 C2DF 0A 01 000021780F'
-		status 'H 45': 'catchall: 0104 FC45 01 01 0140 00 D9B9 00 04 C2DF 0A 01 0000218911'
-		status 'H 57': 'catchall: 0104 FC45 01 01 0140 00 4E55 00 04 C2DF 0A 01 0000211316'
-		status 'H 53': 'catchall: 0104 FC45 01 01 0140 00 20CD 00 04 C2DF 0A 01 0000219814'
-		status 'H 43': 'read attr - raw: BF7601FC450C00000021A410, dni: BF76, endpoint: 01, cluster: FC45, size: 0C, attrId: 0000, result: success, encoding: 21, value: 10a4'
+		fingerprint profileId: "0104", inClusters: "0000,0001,0402,0405", outClusters: "0019", manufacturer: "_TZ2000_a476raq2", model :"TS0201", deviceJoinName: "Tuneway Tuya Temp & Humidity Sensor" // 0x0019: OTA_CLUSTER
 	}
 
 	preferences {
-		input "tempOffset", "number", title: "Temperature offset", description: "Select how many degrees to adjust the temperature.", range: "-100..100", displayDuringSetup: false
-		input "humidityOffset", "number", title: "Humidity offset", description: "Enter a percentage to adjust the humidity.", range: "*..*", displayDuringSetup: false
-	}
-
-	tiles(scale: 2) {
-		multiAttributeTile(name: "temperature", type: "generic", width: 6, height: 4, canChangeIcon: true) {
-			tileAttribute("device.temperature", key: "PRIMARY_CONTROL") {
-				attributeState "temperature", label: '${currentValue}°',
-						backgroundColors: [
-								[value: 31, color: "#153591"],
-								[value: 44, color: "#1e9cbb"],
-								[value: 59, color: "#90d2a7"],
-								[value: 74, color: "#44b621"],
-								[value: 84, color: "#f1d801"],
-								[value: 95, color: "#d04e00"],
-								[value: 96, color: "#bc2323"]
-						]
-			}
-		}
-		valueTile("humidity", "device.humidity", inactiveLabel: false, width: 2, height: 2) {
-			state "humidity", label: '${currentValue}% humidity', unit: ""
-		}
-		valueTile("battery", "device.battery", decoration: "flat", inactiveLabel: false, width: 2, height: 2) {
-			state "battery", label: '${currentValue}% battery'
-		}
-		standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
-			state "default", action: "refresh.refresh", icon: "st.secondary.refresh"
-		}
-
-		main "temperature", "humidity"
-		details(["temperature", "humidity", "battery", "refresh"])
+		input "tempOffset", "decimal", title: "Temperature offset", description: "Select how many degrees to adjust the temperature.", range: "-100..100", displayDuringSetup: false
+		input "humidityOffset", "decimal", title: "Humidity offset", description: "Enter a percentage to adjust the humidity.", range: "*..*", displayDuringSetup: false
+		input "infoLogging", "bool", title: "Enable info message logging", description: ""
+		input "debugLogging", "bool", title: "Enable debug message logging", description: ""
 	}
 }
 
 def parse(String description) {
-	log.debug "description: $description"
+	logDebug "description: $description"
 
 	// getEvent will handle temperature and humidity
 	Map map = zigbee.getEvent(description)
@@ -94,45 +59,64 @@ def parse(String description) {
 			}
 		} else if (descMap?.clusterInt == zigbee.TEMPERATURE_MEASUREMENT_CLUSTER && descMap.commandInt == 0x07) {
 			if (descMap.data[0] == "00") {
-				log.debug "TEMP REPORTING CONFIG RESPONSE: $descMap"
+				logDebug "TEMP REPORTING CONFIG RESPONSE: $descMap"
 				sendEvent(name: "checkInterval", value: 60 * 12, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
 			} else {
-				log.warn "TEMP REPORTING CONFIG FAILED- error code: ${descMap.data[0]}"
+				logWarn "TEMP REPORTING CONFIG FAILED- error code: ${descMap.data[0]}"
 			}
+		} else if (descMap?.clusterInt == 0x0405 && descMap.commandInt == 0x07) { // Relative humidity cluster ID
+			if (descMap.data[0] == "00") {
+				logDebug "HUMIDITY REPORTING CONFIG RESPONSE: $descMap"
+				sendEvent(name: "checkInterval", value: 60 * 12, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
+			} else {
+				logWarn "HUMIDITY REPORTING CONFIG FAILED- error code: ${descMap.data[0]}"
+			}
+		} else if (descMap?.clusterInt == 0x0405 ) { // Relative humidity cluster ID
+			map = parseHumidity(descMap.value)
+		} else {
+			logWarn "No condition matched: clusterInt: ${descMap?.clusterInt}; commandInt: ${descMap.commandInt}"
 		}
 	} else if (map.name == "temperature") {
 		if (tempOffset) {
 			map.value = new BigDecimal((map.value as float) + (tempOffset as float)).setScale(1, BigDecimal.ROUND_HALF_UP)
 		}
-		map.descriptionText = temperatureScale == 'C' ? '{{ device.displayName }} was {{ value }}°C' : '{{ device.displayName }} was {{ value }}°F'
+		map.descriptionText = temperatureScale == 'C' ? "${device.displayName} was ${map.value}°C" : "${device.displayName} temperature is ${map.value}°F"
 		map.translatable = true
-	} else if (map.name == "humidity") {
-		if (humidityOffset) {
-			map.value = (int) map.value + (int) humidityOffset
-		}
 	}
 
-	log.debug "Parse returned $map"
+	logDebug "Parse returned $map"
 	return map ? createEvent(map) : [:]
 }
 
+// Calculate humidity (from Konke ZigBee Temperture Humidity Sensor driver
+private parseHumidity(valueHex) {
+	float humidity = Integer.parseInt(valueHex,16)/100
+	//logDebug ("Raw reported humidity = ${humidity}, date = ${valueHex}")
+	humidity = humidityOffset ? (humidity + (humidityOffset as float)) : humidity
+	return [
+		name: 'humidity',
+		value: (int) humidity.round(),
+		unit: "%"//,
+		//descriptionText: "${device.displayName} humidity is ${humidity.round()}%"
+	]
+}
 
 def getBatteryPercentageResult(rawValue) {
-	log.debug "Battery Percentage rawValue = ${rawValue} -> ${rawValue / 2}%"
+	logDebug "Battery Percentage rawValue = ${rawValue} -> ${rawValue / 2}%"
 	def result = [:]
 
 	if (0 <= rawValue && rawValue <= 200) {
 		result.name = 'battery'
 		result.translatable = true
 		result.value = Math.round(rawValue / 2)
-		result.descriptionText = "${device.displayName} battery was ${result.value}%"
+		result.descriptionText = "${device.displayName} battery is ${result.value}%"
 	}
 
 	return result
 }
 
 private Map getBatteryResult(rawValue) {
-	log.debug 'Battery'
+	logDebug 'Battery'
 	def linkText = getLinkText(device)
 
 	def result = [:]
@@ -146,7 +130,7 @@ private Map getBatteryResult(rawValue) {
 		if (roundedPct <= 0)
 			roundedPct = 1
 		result.value = Math.min(100, roundedPct)
-		result.descriptionText = "${linkText} battery was ${result.value}%"
+		result.descriptionText = "${device.displayName} battery is ${result.value}%"
 		result.name = 'battery'
 
 	}
@@ -154,15 +138,15 @@ private Map getBatteryResult(rawValue) {
 	return result
 }
 
-/**
- * PING is used by Device-Watch in attempt to reach the Device
- * */
+////////
+// PING is used by Device-Watch in attempt to reach the Device
+//
 def ping() {
 	return zigbee.readAttribute(0x0001, 0x0020) // Read the Battery Level
 }
 
 def refresh() {
-	log.debug "refresh temperature, humidity, and battery"
+	logDebug "refresh temperature, humidity, and battery"
 
 	def manufacturer = device.getDataValue("manufacturer")
 
@@ -174,21 +158,25 @@ def refresh() {
 		return zigbee.readAttribute(zigbee.POWER_CONFIGURATION_CLUSTER, 0x0020)+
 			zigbee.readAttribute(zigbee.TEMPERATURE_MEASUREMENT_CLUSTER, 0x0000)+
 			zigbee.readAttribute(zigbee.RELATIVE_HUMIDITY_CLUSTER, 0x0000)
-	} else {
+	} else if (manufacturer == "CentraLite") {
 		return zigbee.readAttribute(0xFC45, 0x0000, ["mfgCode": 0x104E]) +   // New firmware
 			zigbee.readAttribute(0xFC45, 0x0000, ["mfgCode": 0xC2DF]) +   // Original firmware
 			zigbee.readAttribute(zigbee.TEMPERATURE_MEASUREMENT_CLUSTER, 0x0000) +
 			zigbee.readAttribute(zigbee.POWER_CONFIGURATION_CLUSTER, 0x0020)
+	} else {
+		return zigbee.readAttribute(zigbee.TEMPERATURE_MEASUREMENT_CLUSTER, 0x0000) +
+			zigbee.readAttribute(zigbee.POWER_CONFIGURATION_CLUSTER, 0x0020) +
+			zigbee.readAttribute(0x0405, 0x0000) // pfm - humidity
 	}
 }
 
 def configure() {
 	// Device-Watch allows 2 check-in misses from device + ping (plus 1 min lag time)
 	// enrolls with default periodic reporting until newer 5 min interval is confirmed
-	sendEvent(name: "checkInterval", value: 2 * 60 * 60 + 1 * 60, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
+	//sendEvent(name: "checkInterval", value: 2 * 60 * 60 + 1 * 60, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
 
-	log.debug "Configuring Reporting and Bindings."
-
+	logDebug "Configuring Reporting and Bindings."
+	
 	// temperature minReportTime 30 seconds, maxReportTime 5 min. Reporting interval if no activity
 	// battery minReport 30 seconds, maxReportTime 6 hrs by default
 	def manufacturer = device.getDataValue("manufacturer")
@@ -202,10 +190,15 @@ def configure() {
 			zigbee.configureReporting(zigbee.RELATIVE_HUMIDITY_CLUSTER, 0x0000, DataType.UINT16, 60, 600, 1*100) +
 			zigbee.configureReporting(zigbee.TEMPERATURE_MEASUREMENT_CLUSTER, 0x0000, DataType.INT16, 60, 600, 0xA) +
 			zigbee.configureReporting(zigbee.POWER_CONFIGURATION_CLUSTER, 0x0020, DataType.UINT8, 30, 21600, 0x1)
-	} else {
+	} else if (manufacturer == "CentraLite") {
 		return refresh() +
 			zigbee.configureReporting(0xFC45, 0x0000, DataType.UINT16, 30, 3600, 100, ["mfgCode": 0x104E]) +   // New firmware
 			zigbee.configureReporting(0xFC45, 0x0000, DataType.UINT16, 30, 3600, 100, ["mfgCode": 0xC2DF]) +   // Original firmware
+			zigbee.batteryConfig() +
+			zigbee.temperatureConfig(30, 300)
+	} else {
+		return refresh() +
+			zigbee.configureReporting(0x0405, 0x0000, DataType.UINT16, 30, 300, 100) +
 			zigbee.batteryConfig() +
 			zigbee.temperatureConfig(30, 300)
 	}
@@ -214,3 +207,8 @@ def configure() {
 private Boolean isFrientSensor() {
 	device.getDataValue("manufacturer") == "frient A/S"
 }
+
+void logTrace(msg) { log.trace "${device.label} ${msg}" }
+void logDebug(msg) { if(debugLogging) { log.debug "${msg}" } }
+void logInfo(msg) { if (infoLogging) {log.info "${msg}" } }
+void logWarn(msg) { log.warn "${msg}" }
