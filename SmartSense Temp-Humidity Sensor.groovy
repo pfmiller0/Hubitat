@@ -172,7 +172,7 @@ private Map getDewPoint(float temp, float humidity) {
 		dp = temp - (100 - humidity) / 5
 	}
 	
-	result.value = dp
+	result.value = Math.round(dp)
 	result.descriptionText = "${device.displayName} dew point is ${result.value}%"
 	result.name = 'dewpoint'
 
