@@ -88,6 +88,9 @@ def parse(String description) {
 		}
 		map.descriptionText = temperatureScale == 'C' ? "${device.displayName} was ${map.value}°C" : "${device.displayName} temperature is ${map.value}°F"
 		map.translatable = true
+	} else if (map.name == "battery") {
+		map.descriptionText = "${device.displayName} battery level is ${map.value}%"
+		map.translatable = true
 	}
 
 	// Update dew point
