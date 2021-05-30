@@ -20,19 +20,17 @@ preferences {
     section("Lights") {
     	input "colorToggle", "bool", title: "Color toggle mode", submitOnChange: true
 		input "primaryLight", "capability.colorControl", title: "Primary Light", multiple: false
-		if (!colorToggle) {
-			input "secondaryLight", "capability.colorControl", title: "Secondary Light", multiple: false
-		} else {
-			if (!priTempToggle) {
-				input "priColor", "string", title: "Primary Color <i style=\"font-size:80%\">[hue:100, saturation:100, level:100]</i>", defaultValue: '[hue:50, saturation:50, level:50]'
-			} else {
+		if (colorToggle) {
+			if (priTempToggle) {
 				input "priTemp", "string", title: "Primary Temperature <i style=\"font-size:80%\">[colorTemperature:9000, level:100]</i>", defaultValue: '[colorTemperature:4500, level:50]'
+			} else {
+				input "priColor", "string", title: "Primary Color <i style=\"font-size:80%\">[hue:100, saturation:100, level:100]</i>", defaultValue: '[hue:50, saturation:50, level:50]'
 			}
 			if (!secRandom) {
-				if (!secTempToggle) {
-					input "secColor", "string", title: "Secondary Color <i style=\"font-size:80%\">[hue:100, saturation:100, level:100]</i>", defaultValue: '[hue:50, saturation:50, level:50]'
-				} else {
+				if (secTempToggle) {
 					input "secTemp", "string", title: "Secondary Temperature <i style=\"font-size:80%\">[colorTemperature:9000, level:100]</i>", defaultValue: '[colorTemperature:4500, level:50]'
+				} else {
+					input "secColor", "string", title: "Secondary Color <i style=\"font-size:80%\">[hue:100, saturation:100, level:100]</i>", defaultValue: '[hue:50, saturation:50, level:50]'
 				}
 			}
 			input "priTempToggle", "bool", title: "Primary use color temp", submitOnChange: true
@@ -40,7 +38,10 @@ preferences {
 				input "secTempToggle", "bool", title: "Secondary use color temp", submitOnChange: true
 			}
 			input "secRandom", "bool", title: "Secondary use random color", submitOnChange: true
+		} else {
+			input "secondaryLight", "capability.colorControl", title: "Secondary Light", multiple: false
 		}
+
 	}
 	    section("Button") {
 		input "roomButton", "capability.pushableButton", title: "Button", multiple: false
