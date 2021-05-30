@@ -51,6 +51,10 @@ def parse(String description) {
 
 	// getEvent will handle temperature and humidity
 	Map map = zigbee.getEvent(description)
+	
+	// Event for dewpoint if temp or humidity are updated
+	Map dpEvent = [:]
+	
 	if (!map) {
 		Map descMap = zigbee.parseDescriptionAsMap(description)
 		if (descMap.clusterInt == 0x0001 && descMap.commandInt != 0x07 && descMap?.value) {
@@ -88,14 +92,20 @@ def parse(String description) {
 
 	// Update dew point
 	if (map.name == "temperature") {
-		createEvent(getDewPoint(map.value, device.currentValue("humidity")));
+		dpEvent = createEvent(getDewPoint(map.value, device.currentValue("humidity")))
 	} else if (map.name == "humidity") {
-		createEvent(getDewPoint(device.currentValue("temperature"), map.value));
+		dpEvent = createEvent(getDewPoint(device.currentValue("temperature"), map.value))
 	}
 	
 	logDebug "Parse returned $map"
 	if (map) {
-		return createEvent(map)
+		if (dpEvent) {
+			logDebug "dpEvent returned"
+			return [createEvent(map), dpEvent]
+		} else {
+			logDebug "No dpEvent"
+			return createEvent(map)
+		}
 	} else {
 		logDebug "Returning empty map"
 		return [:]
