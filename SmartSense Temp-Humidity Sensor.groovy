@@ -94,7 +94,12 @@ def parse(String description) {
 	}
 	
 	logDebug "Parse returned $map"
-	return map ? createEvent(map) : [:]
+	if (map) {
+		return createEvent(map)
+	} else {
+		logDebug "Returning empty map"
+		return [:]
+	}
 }
 
 // Calculate humidity (from Konke ZigBee Temperture Humidity Sensor driver
