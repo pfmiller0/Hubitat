@@ -24,7 +24,9 @@ metadata {
 		capability "Relative Humidity Measurement"
 		//capability "Health Check"
 		capability "Sensor"
-
+		
+		attribute "dewPoint", "number"
+		
 		fingerprint profileId: "0104", inClusters: "0001,0003,0020,0402,0B05,FC45", outClusters: "0019,0003", manufacturer: "CentraLite", model: "3310-S", deviceJoinName: "Multipurpose Sensor"
 		fingerprint profileId: "0104", inClusters: "0001,0003,0020,0402,0B05,FC45", outClusters: "0019,0003", manufacturer: "CentraLite", model: "3310-G", deviceJoinName: "Centralite Multipurpose Sensor" //Centralite Temp & Humidity Sensor
 		fingerprint profileId: "0104", inClusters: "0001,0003,0020,0402,0B05,FC45", outClusters: "0019,0003", manufacturer: "CentraLite", model: "3310", deviceJoinName: "Multipurpose Sensor"
@@ -84,6 +86,13 @@ def parse(String description) {
 		map.translatable = true
 	}
 
+	// Update dew point
+	if (map.name == "temperature") {
+		createEvent(getDewPoint(map.value, device.currentValue("humidity")));
+	} else if (map.name == "humidity") {
+		createEvent(getDewPoint(device.currentValue("temperature"), map.value));
+	}
+	
 	logDebug "Parse returned $map"
 	return map ? createEvent(map) : [:]
 }
@@ -134,6 +143,23 @@ private Map getBatteryResult(rawValue) {
 		result.name = 'battery'
 
 	}
+
+	return result
+}
+
+private Map getDewPoint(float temp, float humidity) {
+	def result = [:]
+	def dp = 0.0
+	
+	if (location.temperatureScale == "F") {
+		dp = temp - (9/25) * (100 - humidity)
+	} else {
+		dp = temp - (100 - humidity) / 5
+	}
+	
+	result.value = dp
+	result.descriptionText = "${device.displayName} dew point is ${result.value}%"
+	result.name = 'dewpoint'
 
 	return result
 }
