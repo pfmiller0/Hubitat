@@ -165,15 +165,19 @@ private Map getBatteryResult(rawValue) {
 private Map getDewPoint(float temp, float humidity) {
 	def result = [:]
 	def dp = 0.0
+	def unit = ""
 	
 	if (location.temperatureScale == "F") {
 		dp = temp - (9/25) * (100 - humidity)
+		unit = "F"
 	} else {
 		dp = temp - (100 - humidity) / 5
+		umit = "C"
 	}
 	
 	result.value = Math.round(dp)
-	result.descriptionText = "${device.displayName} dew point is ${result.value}%"
+	result.unit = unit
+	result.descriptionText = "${device.displayName} dew point is ${result.value} ${result.unit}"
 	result.name = 'dewpoint'
 
 	return result
