@@ -105,7 +105,7 @@ private parseHumidity(valueHex) {
 	return [
 		name: 'humidity',
 		value: (int) humidity.round(),
-		unit: "%"//,
+		unit: "%",
 		descriptionText: "${device.displayName} humidity is ${humidity.round()}%"
 	]
 }
