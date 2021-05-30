@@ -25,7 +25,7 @@ metadata {
 		//capability "Health Check"
 		capability "Sensor"
 		
-		attribute "dewPoint", "number"
+		attribute "dewpoint", "number"
 		
 		fingerprint profileId: "0104", inClusters: "0001,0003,0020,0402,0B05,FC45", outClusters: "0019,0003", manufacturer: "CentraLite", model: "3310-S", deviceJoinName: "Multipurpose Sensor"
 		fingerprint profileId: "0104", inClusters: "0001,0003,0020,0402,0B05,FC45", outClusters: "0019,0003", manufacturer: "CentraLite", model: "3310-G", deviceJoinName: "Centralite Multipurpose Sensor" //Centralite Temp & Humidity Sensor
