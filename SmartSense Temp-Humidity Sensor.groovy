@@ -26,6 +26,7 @@ metadata {
 		capability "Sensor"
 		
 		attribute "dewpoint", "number"
+		attribute "battery", "number"
 		
 		fingerprint profileId: "0104", inClusters: "0001,0003,0020,0402,0B05,FC45", outClusters: "0019,0003", manufacturer: "CentraLite", model: "3310-S", deviceJoinName: "Multipurpose Sensor"
 		fingerprint profileId: "0104", inClusters: "0001,0003,0020,0402,0B05,FC45", outClusters: "0019,0003", manufacturer: "CentraLite", model: "3310-G", deviceJoinName: "Centralite Multipurpose Sensor" //Centralite Temp & Humidity Sensor
@@ -89,6 +90,7 @@ def parse(String description) {
 		map.descriptionText = temperatureScale == 'C' ? "${device.displayName} was ${map.value}°C" : "${device.displayName} temperature is ${map.value}°F"
 		map.translatable = true
 	} else if (map.name == "battery") {
+		map.value = Math.round(map.value)
 		map.descriptionText = "${device.displayName} battery level is ${map.value}%"
 		map.translatable = true
 	}
