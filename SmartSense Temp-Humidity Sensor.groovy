@@ -91,6 +91,7 @@ def parse(String description) {
 		map.translatable = true
 	} else if (map.name == "battery") {
 		map.value = Math.round(map.value)
+		map.umit = "%"
 		map.descriptionText = "${device.displayName} battery level is ${map.value}%"
 		map.translatable = true
 	}
@@ -136,6 +137,7 @@ def getBatteryPercentageResult(rawValue) {
 
 	if (0 <= rawValue && rawValue <= 200) {
 		result.name = 'battery'
+		result.unit = "%"
 		result.translatable = true
 		result.value = Math.round(rawValue / 2)
 		result.descriptionText = "${device.displayName} battery is ${result.value}%"
@@ -159,6 +161,7 @@ private Map getBatteryResult(rawValue) {
 		if (roundedPct <= 0)
 			roundedPct = 1
 		result.value = Math.min(100, roundedPct)
+		result.unit = "%"
 		result.descriptionText = "${device.displayName} battery is ${result.value}%"
 		result.name = 'battery'
 
