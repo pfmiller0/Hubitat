@@ -1,5 +1,7 @@
 /**
- *  SmartSense Temp/Humidity Sensor
+ *  Tuneway Tuya Temp & Humidity Sensor 
+ *  
+ *  Originally derived from SmartThings SmartSense Temp/Humidity Sensor
  *
  *  Copyright 2014 SmartThings
  *
@@ -16,9 +18,9 @@
 import hubitat.zigbee.zcl.DataType
 
 metadata {
-	definition(name: "SmartSense Temp/Humidity Sensor",
-		   namespace: "smartthings",
-		   author: "SmartThings",
+	definition(name: "Tuneway Tuya Temp/Humidity Sensor",
+		   namespace: "hyposphere.net",
+		   author: "Peter Miller",
 		   importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/SmartSense%20Temp-Humidity%20Sensor.groovy") {
 		
 		capability "Configuration"
@@ -26,7 +28,6 @@ metadata {
 		capability "Refresh"
 		capability "Temperature Measurement"
 		capability "Relative Humidity Measurement"
-		//capability "Health Check"
 		capability "Sensor"
 		
 		attribute "dewpoint", "number"
