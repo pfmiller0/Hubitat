@@ -81,19 +81,15 @@ def parse(String description) {
 	}
 
 	// Update dew point
-	if (map.name == "humidity") {
+	if (map.name == "humidity") { // For Tuya device temp always updates right before humidity, so no  need to update dewpoint for both
 		dpEvent = createEvent(getDewPoint(device.currentValue("temperature"), map.value))
-	} //else if (map.name == "temperature") {   // Temperature always updates right before humidity, so no  need to update dewpoint for both
-	//	dpEvent = createEvent(getDewPoint(map.value, device.currentValue("humidity")))
-	//}
+	}
 	
 	logDebug "Parse returned $map"
 	if (map) {
 		if (dpEvent) {
-			logDebug "dpEvent returned"
 			return [createEvent(map), dpEvent]
 		} else {
-			logDebug "No dpEvent"
 			return createEvent(map)
 		}
 	} else {
@@ -102,7 +98,7 @@ def parse(String description) {
 	}
 }
 
-// Calculate humidity (from Konke ZigBee Temperture Humidity Sensor driver
+// Calculate humidity (from Konke ZigBee Temperture Humidity Sensor driver)
 private parseHumidity(valueHex) {
 	float humidity = Integer.parseInt(valueHex,16)/100
 	//logDebug ("Raw reported humidity = ${humidity}, date = ${valueHex}")
