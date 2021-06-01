@@ -21,7 +21,7 @@ metadata {
 	definition(name: "Tuneway Tuya Temp/Humidity Sensor",
 		   namespace: "hyposphere.net",
 		   author: "Peter Miller",
-		   importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/SmartSense%20Temp-Humidity%20Sensor.groovy") {
+		   importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Tuneway%20Tuya%20Temp-Humidity%20Sensor.groovy") {
 		
 		capability "Configuration"
 		capability "Battery"
