@@ -97,11 +97,11 @@ def parse(String description) {
 	}
 
 	// Update dew point
-	if (map.name == "temperature") {
-		dpEvent = createEvent(getDewPoint(map.value, device.currentValue("humidity")))
-	} else if (map.name == "humidity") {
+	if (map.name == "humidity") {
 		dpEvent = createEvent(getDewPoint(device.currentValue("temperature"), map.value))
-	}
+	} //else if (map.name == "temperature") {   // Temperature always updates right before humidity, so no  need to update dewpoint for both
+	//	dpEvent = createEvent(getDewPoint(map.value, device.currentValue("humidity")))
+	//}
 	
 	logDebug "Parse returned $map"
 	if (map) {
