@@ -16,7 +16,11 @@
 import hubitat.zigbee.zcl.DataType
 
 metadata {
-	definition(name: "SmartSense Temp/Humidity Sensor", namespace: "smartthings", author: "SmartThings") {
+	definition(name: "SmartSense Temp/Humidity Sensor",
+		   namespace: "smartthings",
+		   author: "SmartThings",
+		   importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/SmartSense%20Temp-Humidity%20Sensor.groovy") {
+		
 		capability "Configuration"
 		capability "Battery"
 		capability "Refresh"
