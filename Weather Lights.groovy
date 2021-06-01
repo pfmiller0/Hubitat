@@ -11,7 +11,8 @@ definition(
 	author: "Peter Miller",
 	description: "Set light color based on current temperature",
 	iconUrl: "",
-	iconX2Url: ""
+	iconX2Url: "",
+	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Weather%20Lights.groovy"
 )
 
 preferences {
