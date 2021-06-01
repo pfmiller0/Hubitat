@@ -10,7 +10,8 @@ definition(
     description: "Allow a single button to switch between two lights or colors with multiple pushes.",
     category: "My Apps",
     iconUrl: "",
-    iconX2Url: ""
+    iconX2Url: "",
+    importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Two%20Light%20Toggle.groovy"
 )
 
 preferences {
