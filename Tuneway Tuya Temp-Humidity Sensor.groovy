@@ -55,14 +55,7 @@ def parse(String description) {
 	
 	if (!map) {
 		Map descMap = zigbee.parseDescriptionAsMap(description)
-		if (descMap?.clusterInt == 0x0405 && descMap.commandInt == 0x07) { // Relative humidity cluster ID
-			if (descMap.data[0] == "00") {
-				logDebug "HUMIDITY REPORTING CONFIG RESPONSE: $descMap"
-				sendEvent(name: "checkInterval", value: 60 * 12, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
-			} else {
-				logWarn "HUMIDITY REPORTING CONFIG FAILED- error code: ${descMap.data[0]}"
-			}
-		} else if (descMap?.clusterInt == 0x0405 ) { // Relative humidity cluster ID
+		if (descMap?.clusterInt == 0x0405 ) { // Relative humidity cluster ID
 			map = parseHumidity(descMap.value)
 		} else {
 			logWarn "No condition matched: clusterInt: ${descMap?.clusterInt}; commandInt: ${descMap.commandInt}"
