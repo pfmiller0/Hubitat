@@ -91,7 +91,7 @@ def parse(String description) {
 		map.translatable = true
 	} else if (map.name == "battery") {
 		map.value = Math.round(map.value)
-		map.umit = "%"
+		map.unit = "%"
 		map.descriptionText = "${device.displayName} battery level is ${map.value}%"
 		map.translatable = true
 	}
