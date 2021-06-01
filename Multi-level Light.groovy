@@ -11,7 +11,8 @@ definition(
     description: "Allow buttons to toggle between multiple light color/level settings",
     category: "My Apps",
     iconUrl: "",
-    iconX2Url: ""
+    iconX2Url: "",
+    importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Multi-level%20Light.groovy"
 )
 
 preferences {
