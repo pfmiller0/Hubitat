@@ -25,8 +25,9 @@ definition(
 	namespace: "hyposphere.net",
 	author: "Peter Miller",
 	description: "Compares two temperatures – indoor vs outdoor, to control a window fan",
-    iconUrl: "",
-    iconX2Url: ""
+	iconUrl: "",
+	iconX2Url: "",
+	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Window%20Fan%20Control.groovy"
 )
 
 preferences {
