@@ -129,21 +129,22 @@ void closedWindow(evt) {
 
 void thermostateOffHandler(evt) {
 	changeFanState("off", "Thermostat disabled. Turning off fan")
+	addAppLabel("Thermostat off", "red")
 }
 
 void temperatureHandler(evt) {
 	Float tempOut = null
 	Float tempIn = null
-    boolean thermostateEnabled = true
+	boolean thermostateEnabled = true
 
 	// Check for thermostat control override switches
-    if (windowControl != null && windowControl.latestValue("contact") == "open") {
-    	logDebug "Thermostat disabled: Window open"
+	if (windowControl != null && windowControl.latestValue("contact") == "open") {
+    		logDebug "Thermostat disabled: Window open"
 		thermostateEnabled = false
-    } else if (switchControl != null && switchControl.latestValue("switch") == "off") {
+	    } else if (switchControl != null && switchControl.latestValue("switch") == "off") {
 		logDebug "Thermostat disabled: switched off"
 		thermostateEnabled = false
-    }
+	}
 
     // Check for temperature sensors active
     if (devicesAnyOnline(thermoOut) && devicesAnyOnline(thermoIn)) {
