@@ -38,12 +38,12 @@ preferences {
 		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
 	section("Temperature control") {
-		input "tempTargetCooling", "number", title: "Target temperature (Cooling)", defaultValue: 69
-		input "tempTargetHeating", "number", title: "Target temperature (Heating)", defaultValue: 71
+		input "tempTargetCooling", "decimal", title: "Target temperature (Cooling)", defaultValue: 69
+		input "tempTargetHeating", "decimal", title: "Target temperature (Heating)", defaultValue: 71
 		input "tempMode", "enum", title: "Control mode", options: ["Cooling", "Heating", "Auto"], description: "Enter mode", defaultValue: "Auto"
-        input "tempAfternoonAdjust", "number", title: "Afternoon temperature adjustment", defaultValue: 3
-        input "tempHeatAdjust", "number", title: "Heating mode temperature adjustment", defaultValue: 3
-        input "tempAutoModeChangeThreshold", "number", title: "Auto mode change threshold", defaultValue: 5
+        input "tempAfternoonAdjust", "decimal", title: "Afternoon temperature adjustment", defaultValue: 3
+        input "tempHeatAdjust", "decimal", title: "Heating mode temperature adjustment", defaultValue: 3
+        input "tempAutoModeChangeThreshold", "decimal", title: "Auto mode change threshold", defaultValue: 5
 	}
     
 	section("Devices") {
