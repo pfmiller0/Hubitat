@@ -72,11 +72,11 @@ void raiseLights(evt) {
 		light.latestValue("level") <= lightRaisePrimaryLevel - 3 ||
 		light.latestValue("level") >= lightRaisePrimaryLevel + 3) {
 		
-		light.setLevel(lightRaisePrimaryLevel); light.setColorTemperature(lightRaisePrimaryTemp)
-		//light.setColorTemperature(lightRaisePrimaryTemp, lightRaisePrimaryLevel)
+		//light.setLevel(lightRaisePrimaryLevel); light.setColorTemperature(lightRaisePrimaryTemp)
+		light.setColorTemperature(lightRaisePrimaryTemp, lightRaisePrimaryLevel)
 	} else {
-		light.setLevel(lightRaiseSecLevel); light.setColorTemperature(lightRaiseSecTemp)
-		//light.setColorTemperature(lightRaiseSecTemp, lightRaiseSecLevel)
+		//light.setLevel(lightRaiseSecLevel); light.setColorTemperature(lightRaiseSecTemp)
+		light.setColorTemperature(lightRaiseSecTemp, lightRaiseSecLevel)
 	}
 }
 
@@ -85,10 +85,10 @@ void lowerLights(evt) {
 		light.latestValue("level") <= lightLowerPrimaryLevel - 3 ||
 		light.latestValue("level") >= lightLowerPrimaryLevel + 3) {
 		
-		light.setLevel(lightLowerPrimaryLevel); light.setColorTemperature(lightLowerPrimaryTemp)
-		//light.setColorTemperature(lightLowerPrimaryTemp, lightLowerPrimaryLevel)
+		//light.setLevel(lightLowerPrimaryLevel); light.setColorTemperature(lightLowerPrimaryTemp)
+		light.setColorTemperature(lightLowerPrimaryTemp, lightLowerPrimaryLevel)
 	} else {
-		light.setLevel(lightLowerSecLevel); light.setColorTemperature(lightLowerSecTemp)
-		//light.setColorTemperature(lightLowerSecTemp, lightLowerSecLevel)
+		//light.setLevel(lightLowerSecLevel); light.setColorTemperature(lightLowerSecTemp)
+		light.setColorTemperature(lightLowerSecTemp, lightLowerSecLevel)
 	}
 }
