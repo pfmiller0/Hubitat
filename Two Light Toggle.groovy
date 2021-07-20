@@ -108,8 +108,9 @@ void twoColorToggle(evt) {
 
 		if (curColor != priColor) {
 			if (priTempToggle) {
-				primaryLight.setLevel(priColor["level"]);
-				primaryLight.setColorTemperature(priColor["colorTemperature"])
+				//primaryLight.setLevel(priColor["level"]);
+				//primaryLight.setColorTemperature(priColor["colorTemperature"])
+				primaryLight.setColorTemperature(priColor["colorTemperature"], priColor["level"])
 			} else {
 				primaryLight.setColor(priColor)
 			}
