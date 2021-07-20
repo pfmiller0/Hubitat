@@ -126,8 +126,9 @@ void twoColorToggle(evt) {
 			}
 
 			if (secTempToggle) {
-				primaryLight.setLevel(secColor["level"]);
-				primaryLight.setColorTemperature(secColor["colorTemperature"])
+				//primaryLight.setLevel(secColor["level"]);
+				//primaryLight.setColorTemperature(secColor["colorTemperature"])
+				primaryLight.setColorTemperature(secColor["colorTemperature"], secColor["level"])
 			} else {
 				primaryLight.setColor(secColor)
 			}
