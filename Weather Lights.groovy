@@ -24,7 +24,7 @@ preferences {
 		input "myLights", "capability.colorControl", title: "Lights", required: true, multiple: true
 	}
 	section("Settings") {
-		input "colorOption", "enum", title: "Color scale", options: ["Pete's", "Weather Channel", "Spectrum", "Smartthings"]
+		input "colorOption", "enum", title: "Color scale", options: ["Pete's", "Weather Channel", "Spectrum", "Spectrum 2", "Smartthings"]
 		input "saturationOption", "decimal", title: "Saturation (0..1) ", required: true, defaultValue: 0.95, range: "0..1"
 	}
 	section("Debug") {
@@ -99,6 +99,18 @@ List<Map> tempScaleSpectrum() {
 	]
 }
 
+List<Map> tempScaleSpectrum2() {
+	return [
+		[temp: 0, hsv: [83, 75, 0], name: "purple"],
+		[temp: 32, hsv: [83, 100, 0], name: "purple"],
+		[temp: 65, hsv: [49, 100, 0], name: ""],
+		[temp: 70, hsv: [37, 100, 0], name: ""],
+		[temp: 75, hsv: [25, 100, 0], name: " "],
+		[temp: 100, hsv: [0, 100, 0], name: "red"],
+		[temp: 120, hsv: [0, 75, 0], name: "red"]
+	]
+}
+
 void installed() {
 	if (debugMode) log.debug "Installed: $settings"
 	initialize()
@@ -124,6 +136,9 @@ void initialize() {
 		} else if (colorOption == "Spectrum") {
 			if (debugMode) log.debug "Using Spectrum colors"
 			state.tempScale = tempScaleSpectrum()
+		} else if (colorOption == "Spectrum 2") {
+			if (debugMode) log.debug "Using Spectrum2 colors"
+			state.tempScale = tempScaleSpectrum2()
 		} else if (colorOption == "Smartthings") {
 			if (debugMode) log.debug "Using Smartthings colors"
 			state.tempScale = tempScaleSmartthings()
