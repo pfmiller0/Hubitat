@@ -1,11 +1,8 @@
-gglibrary(
-        base: "driver",
+library(
         author: "Peter Miller",
-        category: "",
-        description: "Common",
+        description: "",
         name: "plib",
         namespace: "hyposphere.net",
-        documentationLink: ""
 )
 
 
