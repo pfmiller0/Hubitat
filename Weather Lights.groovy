@@ -94,6 +94,9 @@ List<Map> tempScaleSpectrum() {
 	return [
 		[temp: 0, hsv: [83, 75, 0], name: "purple"],
 		[temp: 32, hsv: [83, 100, 0], name: "purple"],
+#	[temp: 65, hsv: [43, 100, 0], name: ""],
+#		[temp: 70, hsv: [37, 100, 0], name: ""],
+#		[temp: 75, hsv: [31, 100, 0], name: ""],
 		[temp: 100, hsv: [0, 100, 0], name: "red"],
 		[temp: 120, hsv: [0, 75, 0], name: "red"]
 	]
