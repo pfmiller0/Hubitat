@@ -40,6 +40,7 @@ metadata {
 		input "tempOffset", "decimal", title: "Temperature offset", description: "Select how many degrees to adjust the temperature.", range: "-100..100", displayDuringSetup: false
 		input "humidityOffset", "decimal", title: "Humidity offset", description: "Enter a percentage to adjust the humidity.", range: "*..*", displayDuringSetup: false
 		input "infoLogging", "bool", title: "Enable info message logging", description: ""
+		input "warnLogging", "bool", title: "Enable warn message logging", description: ""
 		input "debugLogging", "bool", title: "Enable debug message logging", description: ""
 	}
 }
@@ -155,7 +156,6 @@ def configure() {
 		zigbee.temperatureConfig(30, 300)
 }
 
-void logTrace(msg) { log.trace "${device.label} ${msg}" }
-void logDebug(msg) { if(debugLogging) { log.debug "${msg}" } }
-void logInfo(msg) { if (infoLogging) {log.info "${msg}" } }
-void logWarn(msg) { log.warn "${msg}" }
+void logDebug(msg) { if (debugLogging) { log.debug "${msg}" } }
+void logInfo(msg) { if (infoLogging) { log.info "${msg}" } }
+void logWarn(msg) { if (warnLogging) { log.warn "${msg}" } }
