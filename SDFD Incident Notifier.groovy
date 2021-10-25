@@ -167,7 +167,7 @@ List<Map> cleanupList(List<Map> incidents) {
 	List<Map> cleanInc = []
 	
 	incidents.each { inc ->
-		cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate, CallType: inc.CallType, IncidentTypeName: inc.IncidentTypeName, Address: inc.Address, CrossStreet: inc.CrossStreet, Units: inc.Units*.Code]
+		cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate, CallType: inc.CallType, IncidentTypeName: inc.IncidentTypeName, Address: inc.Address, CrossStreet: inc.CrossStreet, Units: inc.Units*.Code.sort()]
 	}
 	
 	return cleanInc
