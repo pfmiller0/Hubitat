@@ -46,7 +46,6 @@ def installed() {
 	refresh()
 }
 
-
 def refresh() {
 	if ( device_search ) {
 		sensorCheckBySearch()
@@ -82,8 +81,8 @@ def uninstalled() {
 void sensorCheckByIndex() {
 	String url="https://api.purpleair.com/v1/sensors/$sensor_index"
 	
-    Map params = [
-	    uri: url,
+	Map params = [
+		uri: url,
 		headers: ['X-API-Key': X_API_Key],
 		requestContentType: "application/json",
 		contentType: "application/json",
@@ -122,15 +121,14 @@ void indexHttpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	sendEvent(name: "sites", value: resp.getJson().sensor.name, descriptionText: "AQI reported from site ${resp.getJson().sensor.name}")
 }
 
-
 void sensorCheckBySearch() {
 	String url="https://api.purpleair.com/v1/sensors"
 
 	float[] coords = parseJson(search_coords)
 	float[] range = parseJson(search_range)
 		
-    Map params = [
-	    uri: url,
+	Map params = [
+		uri: url,
 		headers: ['X-API-Key': X_API_Key],
 		query: [fields: "name,${aqi_interval}", location_type: "0", max_age: 3600, nwlat: coords[0] + range[0], nwlng: coords[1] - range[1], selat: coords[0] - range[0], selng: coords[1] + + range[1]],
 		requestContentType: "application/json",
@@ -172,7 +170,7 @@ void searchHttpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 
 Float sensorAverage(def sensors, int field) {
 	Integer count = 0
-    Float sum = 0
+	Float sum = 0
     
 	sensors.each {
 		sum = sum + Float.valueOf(it[field])
@@ -208,7 +206,7 @@ Integer AQILinear(int AQIhigh, int AQIlow, float Conchigh, float Conclow, float 
 	float a;
 	
 	a=((Concentration-Conclow)/(Conchigh-Conclow))*(AQIhigh-AQIlow)+AQIlow;
-
+	
 	return Math.round(a)
 }
 
