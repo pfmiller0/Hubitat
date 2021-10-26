@@ -5,9 +5,15 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 metadata {
-	definition (name: "PurpleAir AQI Virtual Sensor", namespace: "hyposphere.net", author: "Peter Miller") {
+	definition (
+		name: "PurpleAir AQI Virtual Sensor",
+		namespace: "hyposphere.net",
+		author: "Peter Miller",
+		importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/PurpleAir%20AQI%20Virtual%20Sensor.groovy"
+	)
+	{
 		capability "Sensor"
-        capability "Polling"
+        	capability "Polling"
 
 		attribute "aqi", "number"
 		attribute "category", "string" // Description of current air quality
