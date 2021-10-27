@@ -122,7 +122,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	String sites = sensorData.collect { it[1] }.sort()
 
 	if ( sensorData.size() == 0 ) {
-		log.debug "No sensor data returned"
+		log.error "No sensor data returned"
 	} else {
 		if (sensorData.size() == 1) {
 			sendEvent(name: "sites", value: sites, descriptionText: "AQI reported from site ${sites}")
