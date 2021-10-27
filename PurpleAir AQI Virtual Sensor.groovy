@@ -47,11 +47,7 @@ def installed() {
 }
 
 def refresh() {
-	if ( device_search ) {
-		sensorCheckBySearch()
-	} else {
-		sensorCheckByIndex()
-	}
+	sensorCheck()
 }
 
 def configure() {
@@ -78,69 +74,32 @@ def uninstalled() {
 	unschedule()
 }
 
-void sensorCheckByIndex() {
-	String url="https://api.purpleair.com/v1/sensors/$sensor_index"
-	
-	Map params = [
-		uri: url,
-		headers: ['X-API-Key': X_API_Key],
-		requestContentType: "application/json",
-		contentType: "application/json",
-		timeout: 30,
-		ignoreSSLIssues: true
-	]
- 
-	if (debugMode) log.debug "params: $params"
-
-	try {
-		asynchttpGet('indexHttpResponse', params, [data: null])
-	} catch (SocketTimeoutException e) {
-		log.error("Connection to PurpleAir timed out.")
-	} catch (e) {
-		log.error("There was an error: $e")
-	}
-}
-
-void indexHttpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
-	Integer aqiValue = -1
-	
-	if (resp.getStatus() != 200 ) {
-		log.debug "HTTP error: " + resp.getStatus()
-		return
-	}
-	
-	def sensorStats = resp.getJson().sensor.stats
-	//def sensorCoords = [resp.getJson().sensor.latitude, resp.getJson().sensor.longitude]
-
-	aqiValue = getPart2_5_AQI(sensorStats[aqi_interval])
-	AQIcategory = getCategory(aqiValue)
-	
-	//sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${device.displayName} AQI level is ${aqiValue}")
-	sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${AQIcategory}")
-	sendEvent(name: "category", value: AQIcategory, descriptionText: "${device.displayName} category is ${AQIcategory}")
-	sendEvent(name: "sites", value: resp.getJson().sensor.name, descriptionText: "AQI reported from site ${resp.getJson().sensor.name}")
-}
-
-void sensorCheckBySearch() {
+void sensorCheck() {
 	String url="https://api.purpleair.com/v1/sensors"
+	Map httpQuery = [:]
+	
+	if ( device_search ) {
+		float[] coords = parseJson(search_coords)
+		float[] range = parseJson(search_range)
+		httpQuery = [fields: "name,${aqi_interval}", location_type: "0", max_age: 3600, nwlat: coords[0] + range[0], nwlng: coords[1] - range[1], selat: coords[0] - range[0], selng: coords[1] + + range[1]]
+	} else {
+		httpQuery = [fields: "name,${aqi_interval}", location_type: "0", max_age: 3600, show_only: "$sensor_index"]
+	}
 
-	float[] coords = parseJson(search_coords)
-	float[] range = parseJson(search_range)
-		
 	Map params = [
 		uri: url,
 		headers: ['X-API-Key': X_API_Key],
-		query: [fields: "name,${aqi_interval}", location_type: "0", max_age: 3600, nwlat: coords[0] + range[0], nwlng: coords[1] - range[1], selat: coords[0] - range[0], selng: coords[1] + + range[1]],
+		query: httpQuery,
 		requestContentType: "application/json",
 		contentType: "application/json",
 		timeout: 30,
 		ignoreSSLIssues: true
 	]
  
-	if (debugMode) log.debug "params: $params"
+	// log.debug "params: $params"
 
 	try {
-		asynchttpGet('searchHttpResponse', params, [data: null])
+		asynchttpGet('httpResponse', params, [data: null])
 	} catch (SocketTimeoutException e) {
 		log.error("Connection to PurpleAir timed out.")
 	} catch (e) {
@@ -148,7 +107,7 @@ void sensorCheckBySearch() {
 	}
 }
 
-void searchHttpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
+void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	Integer aqiValue = -1
 	
 	if (resp.getStatus() != 200 ) {
@@ -161,11 +120,19 @@ void searchHttpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	AQIcategory = getCategory(aqiValue)
 	
 	String sites = sensorData.collect { it[1] }.sort()
-	
-	//sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${device.displayName} AQI level is ${aqiValue}")
-	sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${AQIcategory}")
-	sendEvent(name: "category", value: AQIcategory, descriptionText: "${device.displayName} category is ${AQIcategory}")
-	sendEvent(name: "sites", value: sites, descriptionText: "Reported AQI is average of these sites: ${sites}")
+
+	if ( sensorData.size() == 0 ) {
+		log.debug "No sensor data returned"
+	} else {
+		if (sensorData.size() == 1) {
+			sendEvent(name: "sites", value: sites, descriptionText: "AQI reported from site ${sites}")
+		} else {
+			sendEvent(name: "sites", value: sites, descriptionText: "Reported AQI is average of sites ${sites}")
+		}
+		//sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${device.displayName} AQI level is ${aqiValue}")
+		sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${AQIcategory}")
+		sendEvent(name: "category", value: AQIcategory, descriptionText: "${device.displayName} category is ${AQIcategory}")
+	}
 }
 
 Float sensorAverage(def sensors, int field) {
