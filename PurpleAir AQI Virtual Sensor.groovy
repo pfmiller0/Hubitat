@@ -76,7 +76,7 @@ def uninstalled() {
 
 void sensorCheck() {
 	String url="https://api.purpleair.com/v1/sensors"
-	Map httpQuery = [:]
+	Map httpQuery
 	
 	if ( device_search ) {
 		float[] coords = parseJson(search_coords)
@@ -109,17 +109,20 @@ void sensorCheck() {
 
 void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	Integer aqiValue = -1
+	String[][] sensorData
+	String sites
 	
 	if (resp.getStatus() != 200 ) {
 		log.debug "HTTP error: " + resp.getStatus()
 		return
 	}
 	
-	String[][] sensorData = resp.getJson().data
+	sensorData = resp.getJson().data
 	aqiValue = getPart2_5_AQI(sensorAverage(sensorData, 2))
 	AQIcategory = getCategory(aqiValue)
 	
-	String sites = sensorData.collect { it[1] }.sort()
+	sites = sensorData.collect { it[1] }.sort()
+	//sites = sites.substring(1, sites.length() - 1)
 
 	if ( sensorData.size() == 0 ) {
 		log.error "No sensor data returned"
@@ -170,7 +173,7 @@ Integer getPart2_5_AQI(Float partCount) {
 }
 
 Integer AQILinear(int AQIhigh, int AQIlow, float Conchigh, float Conclow, float Concentration) {
-	float a;
+	float a
 	
 	a=((Concentration-Conclow)/(Conchigh-Conclow))*(AQIhigh-AQIlow)+AQIlow;
 	
