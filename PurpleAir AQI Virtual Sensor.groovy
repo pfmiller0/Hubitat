@@ -132,9 +132,9 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		} else {
 			sendEvent(name: "sites", value: sites, descriptionText: "Reported AQI is average of sites ${sites}")
 		}
+		sendEvent(name: "category", value: AQIcategory, descriptionText: "${device.displayName} category is ${AQIcategory}")
 		//sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${device.displayName} AQI level is ${aqiValue}")
 		sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${AQIcategory}")
-		sendEvent(name: "category", value: AQIcategory, descriptionText: "${device.displayName} category is ${AQIcategory}")
 	}
 }
 
