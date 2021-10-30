@@ -23,15 +23,15 @@ metadata {
 
 	preferences {
 		input name: "X_API_Key", type: "text", title: "PurpleAir API key", required: true, description: "Contact contact@purpleair.com to request an API key"
-		input name: "update_interval", type: "enum", title: "Update interval", required: true, description: "Minutes between updates", options: ["15", "30", "60", "180"], default: "60"
-		input name: "avg_period", type: "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: ["pm2.5", "pm2.5_10minute", "pm2.5_30minute", "pm2.5_60minute", "pm2.5_6hour", "pm2.5_24hour", "pm2.5_1week"], default: "pm2.5_60minute"
-		input name: "device_search", type: "bool", title: "Search for devices", required: true, description: "If false specify device index to use", default: true
+		input name: "update_interval", type: "enum", title: "Update interval", required: true, description: "Minutes between updates", options: ["15", "30", "60", "180"], defaultValue: "60"
+		input name: "avg_period", type: "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: ["pm2.5", "pm2.5_10minute", "pm2.5_30minute", "pm2.5_60minute", "pm2.5_6hour", "pm2.5_24hour", "pm2.5_1week"], defaultValue: "pm2.5_60minute"
+		input name: "device_search", type: "bool", title: "Search for devices", required: true, description: "If false specify device index to use", defaultValue: true
 
 		if ( device_search ) {
-			input name: "search_coords", type: "text", title: "Search coordinates [lat, long]", required: true, description: "Coordinates at center of sensor search box", default: "[32.8662843,-117.2546369]"
-			input name: "search_range", type: "number", title: "Search range (miles)", required: true, description: "Size of sensor search box (+/- center of search box coordinates)", default: 0.5
+			input name: "search_coords", type: "text", title: "Search coordinates [lat, long]", required: true, description: "Coordinates at center of sensor search box", defaultValue: "[32.8662843,-117.2546369]"
+			input name: "search_range", type: "number", title: "Search range (miles)", required: true, description: "Size of sensor search box (+/- center of search box coordinates)", defaultValue: 0.5
 		} else {
-			input name: "sensor_index", type: "number", title: "Sensor index", required: true, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com", default: 90905
+			input name: "sensor_index", type: "number", title: "Sensor index", required: true, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com", defaultValue: 90905
 		}
 	}
 }
@@ -42,8 +42,7 @@ def parse(String description) {
 }
 
 def installed() {
-	configure()
-	refresh()
+	// Do nothing on install because a API key is required
 }
 
 def refresh() {
