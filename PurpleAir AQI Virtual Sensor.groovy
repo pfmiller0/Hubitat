@@ -28,10 +28,10 @@ metadata {
 		input name: "device_search", type: "bool", title: "Search for devices", required: true, description: "If false specify device index to use", default: true
 
 		if ( device_search ) {
-			input name: "search_coords", type: "text", title: "Search coordinates [lat, long]", required: false, description: "Coordinates at center of sensor search box"
-			input name: "search_range", type: "number", title: "Search range (miles)", required: false, description: "Size of sensor search box (+/- center of search box coordinates)"
+			input name: "search_coords", type: "text", title: "Search coordinates [lat, long]", required: true, description: "Coordinates at center of sensor search box", default: "[32.8662843,-117.2546369]"
+			input name: "search_range", type: "number", title: "Search range (miles)", required: true, description: "Size of sensor search box (+/- center of search box coordinates)", default: 0.5
 		} else {
-			input name: "sensor_index", type: "number", title: "Sensor index", required: false, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com"
+			input name: "sensor_index", type: "number", title: "Sensor index", required: true, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com", default: 90905
 		}
 	}
 }
