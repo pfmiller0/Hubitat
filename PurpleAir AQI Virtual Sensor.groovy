@@ -6,7 +6,7 @@
  */
 metadata {
 	definition (
-		name: "PurpleAir AQI Virtual Sensor",
+		name: "PurpleAir AQI Virtual Sensor Test",
 		namespace: "hyposphere.net",
 		author: "Peter Miller",
 		importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/PurpleAir%20AQI%20Virtual%20Sensor.groovy"
@@ -25,13 +25,13 @@ metadata {
 		input name: "X_API_Key", type: "text", title: "PurpleAir API key", required: true, description: "Contact contact@purpleair.com to request an API key"
 		input name: "update_interval", type: "enum", title: "Update interval", required: true, description: "Minutes between updates", options: ["15", "30", "60", "180"], default: "60"
 		input name: "avg_period", type: "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: ["pm2.5", "pm2.5_10minute", "pm2.5_30minute", "pm2.5_60minute", "pm2.5_6hour", "pm2.5_24hour", "pm2.5_1week"], default: "pm2.5_60minute"
-		input name: "device_search", type: "bool", title: "Search for devices", required: true, description: "If false specify device index to use"
+		input name: "device_search", type: "bool", title: "Search for devices", required: true, description: "If false specify device index to use", default: true
 
 		if ( device_search ) {
-			input name: "search_coords", type: "text", title: "Search coordinates [lat, long]", required: true, description: "Coordinates at center of sensor search box"
-			input name: "search_range", type: "text", title: "Search range [lat, long]", required: true, description: "Size of sensor search box (+/- center of search box coordinates)"
+			input name: "search_coords", type: "text", title: "Search coordinates [lat, long]", required: false, description: "Coordinates at center of sensor search box"
+			input name: "search_range", type: "number", title: "Search range (miles)", required: false, description: "Size of sensor search box (+/- center of search box coordinates)"
 		} else {
-			input name: "sensor_index", type: "number", title: "Sensor index", required: true, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com"
+			input name: "sensor_index", type: "number", title: "Sensor index", required: false, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com"
 		}
 	}
 }
@@ -80,10 +80,11 @@ void sensorCheck() {
 	
 	if ( device_search ) {
 		float[] coords = parseJson(search_coords)
-		float[] range = parseJson(search_range)
-		httpQuery = [fields: "name,${avg_period}", location_type: "0", max_age: 3600, nwlat: coords[0] + range[0], nwlng: coords[1] - range[1], selat: coords[0] - range[0], selng: coords[1] + + range[1]]
+		float[] dist2deg = distance2degrees(coords[0])
+		float[] range = [(search_range as float)/dist2deg[0], (search_range as float)/dist2deg[1]]
+		httpQuery = [fields: "name,${avg_period},latitude,longitude", location_type: "0", max_age: 3600, nwlat: coords[0] + range[0], nwlng: coords[1] - range[1], selat: coords[0] - range[0], selng: coords[1] + + range[1]]
 	} else {
-		httpQuery = [fields: "name,${avg_period}", location_type: "0", max_age: 3600, show_only: "$sensor_index"]
+		httpQuery = [fields: "name,${avg_period},latitude,longitude", location_type: "0", max_age: 3600, show_only: "$sensor_index"]
 	}
 
 	Map params = [
@@ -96,7 +97,7 @@ void sensorCheck() {
 		ignoreSSLIssues: true
 	]
  
-	// log.debug "params: $params"
+	//log.debug "params: $params"
 
 	try {
 		asynchttpGet('httpResponse', params, [data: null])
@@ -123,7 +124,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	
 	sites = sensorData.collect { it[1] }.sort()
 	//sites = sites.substring(1, sites.length() - 1)
-
+	
 	if ( sensorData.size() == 0 ) {
 		log.error "No sensor data returned"
 	} else {
@@ -138,7 +139,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	}
 }
 
-Float sensorAverage(def sensors, int field) {
+float sensorAverage(def sensors, int field) {
 	Integer count = 0
 	Float sum = 0
     
@@ -198,4 +199,12 @@ String getCategory(Integer AQI) {
 	} else {
 		return "error"
 	}
+}
+
+// Returns miles per degree for a given latitude
+float[] distance2degrees(float latitude) {	
+	float latMilesPerDegree = 69.172 * Math.cos(Math.toRadians(latitude))
+	float longMilesPerDegree = 69
+	
+	return [latMilesPerDegree, longMilesPerDegree]
 }
