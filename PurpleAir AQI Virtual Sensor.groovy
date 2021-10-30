@@ -6,7 +6,7 @@
  */
 metadata {
 	definition (
-		name: "PurpleAir AQI Virtual Sensor Test",
+		name: "PurpleAir AQI Virtual Sensor",
 		namespace: "hyposphere.net",
 		author: "Peter Miller",
 		importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/PurpleAir%20AQI%20Virtual%20Sensor.groovy"
