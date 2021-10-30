@@ -24,7 +24,7 @@ metadata {
 	preferences {
 		input name: "X_API_Key", type: "text", title: "PurpleAir API key", required: true, description: "Contact contact@purpleair.com to request an API key"
 		input name: "update_interval", type: "enum", title: "Update interval", required: true, description: "Minutes between updates", options: ["15", "30", "60", "180"], default: "60"
-		input name: "aqi_interval", type: "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: ["pm2.5", "pm2.5_10minute", "pm2.5_30minute", "pm2.5_60minute", "pm2.5_6hour", "pm2.5_24hour", "pm2.5_1week"], default: "pm2.5_60minute"
+		input name: "avg_period", type: "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: ["pm2.5", "pm2.5_10minute", "pm2.5_30minute", "pm2.5_60minute", "pm2.5_6hour", "pm2.5_24hour", "pm2.5_1week"], default: "pm2.5_60minute"
 		input name: "device_search", type: "bool", title: "Search for devices", required: true, description: "If false specify device index to use"
 
 		if ( device_search ) {
@@ -81,9 +81,9 @@ void sensorCheck() {
 	if ( device_search ) {
 		float[] coords = parseJson(search_coords)
 		float[] range = parseJson(search_range)
-		httpQuery = [fields: "name,${aqi_interval}", location_type: "0", max_age: 3600, nwlat: coords[0] + range[0], nwlng: coords[1] - range[1], selat: coords[0] - range[0], selng: coords[1] + + range[1]]
+		httpQuery = [fields: "name,${avg_period}", location_type: "0", max_age: 3600, nwlat: coords[0] + range[0], nwlng: coords[1] - range[1], selat: coords[0] - range[0], selng: coords[1] + + range[1]]
 	} else {
-		httpQuery = [fields: "name,${aqi_interval}", location_type: "0", max_age: 3600, show_only: "$sensor_index"]
+		httpQuery = [fields: "name,${avg_period}", location_type: "0", max_age: 3600, show_only: "$sensor_index"]
 	}
 
 	Map params = [
