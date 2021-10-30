@@ -29,7 +29,8 @@ metadata {
 
 		if ( device_search ) {
 			input name: "search_coords", type: "text", title: "Search coordinates [lat, long]", required: true, description: "Coordinates at center of sensor search box", defaultValue: "[32.8662843,-117.2546369]"
-			input name: "search_range", type: "number", title: "Search range (miles)", required: true, description: "Size of sensor search box (+/- center of search box coordinates)", defaultValue: 0.5
+			input name: "search_range", type: "number", title: "Search range", required: true, description: "Size of sensor search box (+/- center of search box coordinates)", defaultValue: 0.5
+			input name: "use_miles", type: "bool", title: "Use miles", required: true, description: "Use kilometers if false", defaultValue: true
 		} else {
 			input name: "sensor_index", type: "number", title: "Sensor index", required: true, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com", defaultValue: 90905
 		}
@@ -80,7 +81,13 @@ void sensorCheck() {
 	if ( device_search ) {
 		float[] coords = parseJson(search_coords)
 		float[] dist2deg = distance2degrees(coords[0])
-		float[] range = [(search_range as float)/dist2deg[0], (search_range as float)/dist2deg[1]]
+		float[] range = []
+
+		if (use_miles) {
+			range = [(search_range as float)/dist2deg[0], (search_range as float)/dist2deg[1]]
+		} else {
+			range = [((search_range as float)/1.609)/dist2deg[0], ((search_range as float)/1.609)/dist2deg[1]]
+		}
 		httpQuery = [fields: "name,${avg_period},latitude,longitude", location_type: "0", max_age: 3600, nwlat: coords[0] + range[0], nwlng: coords[1] - range[1], selat: coords[0] - range[0], selng: coords[1] + + range[1]]
 	} else {
 		httpQuery = [fields: "name,${avg_period},latitude,longitude", location_type: "0", max_age: 3600, show_only: "$sensor_index"]
