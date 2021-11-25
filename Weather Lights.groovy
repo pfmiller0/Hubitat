@@ -108,7 +108,7 @@ List<Map> tempScaleSpectrum2() {
 		[temp: 32, hsv: [83, 100, 0], name: "purple"],
 		[temp: 65, hsv: [49, 100, 0], name: ""],
 		[temp: 70, hsv: [37, 100, 0], name: ""],
-		[temp: 75, hsv: [25, 100, 0], name: " "],
+		[temp: 75, hsv: [25, 100, 0], name: ""],
 		[temp: 100, hsv: [0, 100, 0], name: "red"],
 		[temp: 120, hsv: [0, 75, 0], name: "red"]
 	]
@@ -154,7 +154,7 @@ void initialize() {
 }
 
 void updateLight(evt) {
-	Float tempOut = null
+	Float tempOut
     List<Integer> hsvTempColor = null
 	Float satLevel = saturationOption
 	
@@ -183,7 +183,7 @@ void updateLight(evt) {
 		for (light in myLights) {
 			if (light.latestValue("switch") == "on") {
 				if (debugMode) log.debug "Changing light $light"
-				light.setColor(["hue": hsvTempColor[0], "saturation": hsvTempColor[1]])
+				light.setColor(["hue": hsvTempColor[0], "saturation": hsvTempColor[1], "level": light.latestValue("level")])
 			}
 		}
 	}
@@ -196,7 +196,7 @@ List<Integer> getColor(Float temp, List<Map> colorScale) {
 	List<Integer> colorLow = null
 	List<Integer> colorHigh = null
 	List<Integer> colorLast = null
-	Float rangePercent = null
+	Float rangePercent
 
 	for (i in colorScale) {
 		//if (debugMode) log.debug "i = $i; tempLow = $tempLow; tempHigh = $tempHigh; tempLast = $tempLast"
