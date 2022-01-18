@@ -19,13 +19,13 @@ preferences {
 		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
 	section("Button") {
-		input "roomButton", "capability.pushableButton", title: "Button", multiple: false
-		input "buttonAction", "enum", title: "Button action", options: ["pushed", "doubleTapped", "held"], required: true
-		input "secondPressTime", "number", title: "Double press time limit (milliseconds)", defaultValue: 500
+		input "roomButton", "capability.pushableButton", title: "Button", required: true, multiple: false
+		input "buttonAction", "enum", title: "Button action", options: ["pushed", "doubleTapped", "held"], required: true, defaultValue: "pushed"
+		input "secondPressTime", "number", title: "Double press time limit (milliseconds)", required: true, defaultValue: 500
 	}
 	section("Switches") {
-		input "singleSwitch", "capability.switch", title: "Single press switch", multiple: false
-		input "doubleSwitch", "capability.switch", title: "Double press switch", multiple: false
+		input "singleSwitch", "capability.switch", title: "Single press switch", required: true, multiple: false
+		input "doubleSwitch", "capability.switch", title: "Double press switch", required: true, multiple: false
 	}
 }
 
