@@ -11,6 +11,7 @@ definition(
     category: "My Apps",
     iconUrl: "",
     iconX2Url: ""
+    importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Double-Tap%20App.groovy"
 )
 
 preferences {
