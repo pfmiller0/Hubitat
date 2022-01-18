@@ -1,0 +1,76 @@
+/**
+ *  Double-Tap App
+ *
+ *  Copyright 2022 Peter Miller
+ */
+definition(
+    name: "Double-Tap App",
+    namespace: "hyposphere.net",
+    author: "Peter Miller",
+    description: "Virtual double tap",
+    category: "My Apps",
+    iconUrl: "",
+    iconX2Url: ""
+)
+
+preferences {
+	section() {
+		input "isPaused", "bool", title: "Pause app", defaultValue: false
+	}
+	section("Button") {
+		input "roomButton", "capability.pushableButton", title: "Button", multiple: false
+		input "buttonAction", "enum", title: "Button action", options: ["pushed", "doubleTapped", "held"], required: true
+		input "secondPressTime", "number", title: "Double press time limit (milliseconds)", defaultValue: 500
+	}
+	section("Switches") {
+		input "singleSwitch", "capability.switch", title: "Single press switch", multiple: false
+		input "doubleSwitch", "capability.switch", title: "Double press switch", multiple: false
+	}
+}
+
+def installed() {
+	if (logDebug) log.debug "Installed with settings: ${settings}"
+
+	initialize()
+}
+
+def updated() {
+	if (logDebug) log.debug "Updated with settings: ${settings}"
+
+	unsubscribe()
+	initialize()
+}
+
+def initialize() {
+	if (isPaused == false) {
+		subscribe(roomButton, buttonAction, buttonHandler)
+
+		state.LastPress = 0
+	}
+}
+
+void buttonHandler(evt) {
+	if (now() > (state.LastPress + secondPressTime)) {
+		runInMillis(secondPressTime + 1, 'singleHandler', [:])
+		state.LastPress = now()
+	} else {
+		toggle(doubleSwitch)
+		state.LastPress = 0
+		log.debug "Double press"
+	}
+}
+
+void singleHandler() {
+	if (state.LastPress != 0) {
+		toggle(singleSwitch)
+		log.debug "Single press"
+	}
+}
+
+void toggle(devSwitch) {
+	if (devSwitch.latestValue("switch") == "off") {
+		devSwitch.on()
+	} else {
+		devSwitch.off()
+	}
+}
