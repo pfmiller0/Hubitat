@@ -57,14 +57,14 @@ void buttonHandler(evt) {
 	} else {
 		toggle(doubleSwitch)
 		state.LastPress = 0
-		log.debug "Double press"
+		if (logDebug) log.debug "Double press"
 	}
 }
 
 void singleHandler() {
 	if (state.LastPress != 0) {
 		toggle(singleSwitch)
-		log.debug "Single press"
+		if (logDebug) log.debug "Single press"
 	}
 }
 
