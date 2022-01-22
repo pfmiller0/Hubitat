@@ -29,7 +29,7 @@ metadata {
 
 		if ( device_search ) {
 			input name: "search_coords", type: "text", title: "Search coordinates [lat, long]", required: true, description: "Coordinates at center of sensor search box", defaultValue: "[32.8662843,-117.2546369]"
-			input name: "search_range", type: "number", title: "Search range", required: true, description: "Size of sensor search box (+/- center of search box coordinates)", defaultValue: 0.5
+			input name: "search_range", type: "number", title: "Search range", required: true, description: "Size of sensor search box (+/- center of search box coordinates)", defaultValue: 1.5
 			input name: "use_miles", type: "bool", title: "Use miles", required: true, description: "Use kilometers if false", defaultValue: true
 		} else {
 			input name: "sensor_index", type: "number", title: "Sensor index", required: true, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com", defaultValue: 90905
@@ -120,7 +120,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	String sites
 	
 	if (resp.getStatus() != 200 ) {
-		log.debug "HTTP error: " + resp.getStatus()
+		log.error "HTTP error from purpleair.com: " + resp.getStatus()
 		return
 	}
 	
@@ -132,7 +132,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	//sites = sites.substring(1, sites.length() - 1)
 	
 	if ( sensorData.size() == 0 ) {
-		log.error "No sensor data returned"
+		log.error "No sensors found in search area"
 	} else {
 		if (sensorData.size() == 1) {
 			sendEvent(name: "sites", value: sites, descriptionText: "AQI reported from site ${sites}")
