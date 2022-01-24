@@ -45,7 +45,11 @@ preferences {
         input "tempHeatAdjust", "decimal", title: "Heating mode temperature adjustment", defaultValue: 3
         input "tempAutoModeChangeThreshold", "decimal", title: "Auto mode change threshold", defaultValue: 5
 	}
-    
+
+	if (tempMode == "Auto") {
+		section("Auto mode state: " + state.tempModeActive) { }
+	}
+
 	section("Devices") {
 		input "thermoIn", "capability.temperatureMeasurement", title: "Indoor temperature", multiple: true
 		input "thermoOut", "capability.temperatureMeasurement", title: "Outdoor temperature", multiple: true
