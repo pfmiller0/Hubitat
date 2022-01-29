@@ -5,14 +5,15 @@
  */
  
 definition(
-    name: "Multi-level Light",
-    namespace: "hyposphere.net",
-    author: "Peter Miller",
-    description: "Allow buttons to toggle between multiple light color/level settings",
-    category: "My Apps",
-    iconUrl: "",
-    iconX2Url: "",
-    importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Multi-level%20Light.groovy"
+	name: "Multi-level Light",
+	namespace: "hyposphere.net",
+	parent: "hyposphere.net:P's Light Controls",
+	author: "Peter Miller",
+	description: "Allow buttons to toggle between multiple light color/level settings",
+	category: "My Apps",
+	iconUrl: "",
+	iconX2Url: "",
+	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Multi-level%20Light.groovy"
 )
 
 preferences {
