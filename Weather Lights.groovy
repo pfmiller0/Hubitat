@@ -6,8 +6,9 @@
  */
 
 definition(
-	name: "Weather Lights",
+	name: "Weather Light",
 	namespace: "hyposphere.net",
+	parent: "hyposphere.net:P's Light Controls",
 	author: "Peter Miller",
 	description: "Set light color based on current temperature",
 	iconUrl: "",
@@ -155,7 +156,7 @@ void initialize() {
 
 void updateLight(evt) {
 	Float tempOut
-    List<Integer> hsvTempColor = null
+	List<Integer> hsvTempColor = null
 	Float satLevel = saturationOption
 	
 	if (satLevel > 1) {
