@@ -4,14 +4,15 @@
  *  Copyright 2021 Peter Miller
  */
 definition(
-    name: "Two Light Toggle",
-    namespace: "hyposphere.net",
-    author: "Peter Miller",
-    description: "Allow a single button to switch between two lights or colors with multiple pushes.",
-    category: "My Apps",
-    iconUrl: "",
-    iconX2Url: "",
-    importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Two%20Light%20Toggle.groovy"
+	name: "Two Light Toggle",
+	namespace: "hyposphere.net",
+	parent: "hyposphere.net:P's Light Controls",
+	author: "Peter Miller",
+	description: "Allow a single button to switch between two lights or colors with multiple pushes.",
+	category: "My Apps",
+	iconUrl: "",
+	iconX2Url: "",
+	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Two%20Light%20Toggle.groovy"
 )
 
 preferences {
