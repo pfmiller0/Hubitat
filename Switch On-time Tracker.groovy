@@ -14,7 +14,7 @@ definition(
     category: "My Apps",
     iconUrl: "",
     iconX2Url: "",
-    importUrl: "https:"
+    importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Switch%20On-time%20Tracker.groovy"
 )
 
 preferences {
