@@ -17,17 +17,37 @@ definition(
     importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Switch%20On-time%20Tracker.groovy"
 )
 
+
 preferences {
-	section() {
-		input "isPaused", "bool", title: "Pause app", defaultValue: false
+	page(name: "mainPage")
+  	page(name: "resetPage")
+}
+
+def mainPage() {
+	dynamicPage(name: "mainPage", title: " ", install: true, uninstall: true) {
+		section() {
+			input "isPaused", "bool", title: "Pause app", defaultValue: false
+		}
+		section("Settings") {
+			input "switches", "capability.switch", title: "Switches", multiple: false
+			input "notifyDevice", "capability.notification", title: "Notification device", multiple: false, required: false
+		}
+		section("Time on") {
+			if (state.totalOnTime != null) {
+				paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + printTime(getOnTime()) + "</table>"
+			}
+		}
+		section {
+			href "resetPage", title: "Reset time?", description: ""
+		}
 	}
-	section("Settings") {
-		input "switches", "capability.switch", title: "Switches", multiple: false
-		input "notifyDevice", "capability.notification", title: "Notification device", multiple: false, required: false
-	}
-	section("Time on") {
-		if (state.totalOnTime != null) {
-			paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + printTime(getOnTime()) + "</table>"
+}
+
+def resetPage() {
+	dynamicPage(name: "resetPage", title: "Time has been reset!", install: false, uninstall: false) {
+		state.totalOnTime = 0.0
+		if (switches.latestValue("switch") == "on") {
+			state.turnOnTime = now()
 		}
 	}
 }
@@ -50,6 +70,8 @@ void initialize() {
 		state.totalOnTime = state.totalOnTime ? state.totalOnTime : 0.0
 		
 		subscribe(switches, "switch", switchChanged)
+		
+		switchChanged()
 	} else {
 		addAppLabel("Paused", "red")
 	}
