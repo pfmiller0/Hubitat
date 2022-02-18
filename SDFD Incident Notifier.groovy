@@ -21,6 +21,13 @@ preferences {
 	section() {
 		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
+	section("Active Incidents:") {
+		if (state.activeIncidents != []) {
+			paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + incidentsToStr(state.activeIncidents, "table") + "</table>"
+		} else {
+			paragraph "<p align='center'>No active incidents</p>"
+		}
+	}
 	section("Settings") {
 		input "updateTime", "number", title: "Update frequency (mins)", defaultValue: 5
 		input "notifyUnits", "string", title: "Notification unit"
@@ -28,13 +35,6 @@ preferences {
 	}
 	section("Debug") {
 		input "debugMode", "bool", title: "Enable debug logging", defaultValue: false
-	}
-	section("Active Incidents:") {
-		if (state.activeIncidents != []) {
-			paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + incidentsToStr(state.activeIncidents, "table") + "</table>"
-		} else {
-			paragraph "<p align='center'>No active incidents</p>"
-		}
 	}
 }
 
