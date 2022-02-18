@@ -7,13 +7,13 @@
  * 2021-02-07: Switched to asynhttpget. Added tracking of updated incidents
  */
 definition(
-    name: "SDFD Incident Notifier",
-    namespace: "hyposphere.net",
-    author: "Peter Miller",
-    description: "Retrieve SDFD incidents, and provide notification for local incidents.",
-    iconUrl: "",
-    iconX2Url: "",
-    importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/SDFD%20Incident%20Notifier.groovy"
+	name: "SDFD Incident Notifier",
+	namespace: "hyposphere.net",
+	parent: "hyposphere.net:P's Utilities",
+	author: "Peter Miller",
+	description: "Retrieve SDFD incidents, and provide notification for local incidents.",
+	iconUrl: "",
+	iconX2Url: ""
 )
 
 preferences {
@@ -28,12 +28,18 @@ preferences {
 	section("Debug") {
 		input "debugMode", "bool", title: "Enable debug logging", defaultValue: false
 	}
-
+	section("Active Incidents:") {
+		if (state.activeIncidents != []) {
+			paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + incidentsToStr(state.activeIncidents, "table") + "</table>"
+		} else {
+			paragraph "<p align='center'>No active incidents</p>"
+		}
+	}
 }
 
-List<String> IGNORE_INC() { ["Medical", "Medical Alert Alarm", "Logistics", "Facilities", "Duty Mechanic", "Carbon Monoxide Alarm", "Move Up", "CAD Test", "Ringing Alarm", "Elevator Rescue", "Lock in/out", "DMS", "Special Service"] }
-List<String> REDUNDANT_TYPES() { ["Traffic Accidents", "Single Resource", "Single Engine Response", "Advised Incident (misc.)", "Structure Commercial", "Traffic Accident Freeway (NC)", "Nat Gas SING ENG SDGE", "Vehicle vs. Structure"] }
-//List<String> NO_NOTIFICATION_TYPES() { ["Vehicle fire freeway", "Ringing alarm highrise", "Traffic Accident FWY", "Extinguished fire", "Page"] }
+List<String> IGNORE_INC() { ["Medical", "Medical Alert Alarm", "Logistics", "Facilities", "Duty Mechanic", "Carbon Monoxide Alarm", "Page", "Move Up", "STAND BACK HOLD", "CAD Test", "Ringing Alarm", "Elevator Rescue", "Lock in/out", "DMS", "Special Service"] }
+List<String> REDUNDANT_TYPES() { ["Traffic Accidents", "Single Resource", "Single Engine Response", "Hazmat", "TwoEngines", "Advised Incident (misc.)", "MTZ - Vegetaton Inital Attack", "Structure Commercial", "Rescue", "Gaslamp", "Traffic Accident Freeway (NC)", "Nat Gas SING ENG SDGE", "Vehicle vs. Structure", "Alert 1", "Alert 2 Brn/Mont", "Alert 2 Still Alarm"] }
+//List<String> NO_NOTIFICATION_TYPES() { ["Vehicle fire freeway", "Ringing alarm highrise", "Traffic Accident FWY", "Extinguished fire"] }
 List<String> AMBULANCE_UNITS() { ["M", "AM", "BLS", "Sdge"] }
 	
 void installed() {
@@ -169,6 +175,7 @@ List<Map> cleanupList(List<Map> incidents) {
 	incidents.each { inc ->
 		cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate, CallType: inc.CallType, IncidentTypeName: inc.IncidentTypeName, Address: inc.Address, CrossStreet: inc.CrossStreet, Units: inc.Units*.Code.sort()]
 	}
+
 	
 	return cleanInc
 }
@@ -226,12 +233,17 @@ String incidentToStr(Map<String, List> inc, String format) {
     List<String> listIgnoreTypes = REDUNDANT_TYPES()
 	String out = ""
 	String CrossStreet = inc.CrossStreet ? "|$inc.CrossStreet" : ""
-	String IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "-" : "[$inc.IncidentTypeName]"
+	String IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : "[$inc.IncidentTypeName]"
 	String incNum = debugMode ? " ($inc.IncidentNumber)" : ""
 	
 	if (format == "full") {
 		java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
 		out = df.format(toDateTime(inc.ResponseDate)) + incNum + " $inc.CallType $IncidentType $inc.Address$CrossStreet:"
+	} else if (format == "table") {
+		String td = '<td style="border:1px solid silver;">'
+		String tdc = '</td>'
+		java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
+		out = td + df.format(toDateTime(inc.ResponseDate)) + tdc + td + " $inc.CallType $IncidentType" + tdc + td + "$inc.Address$CrossStreet" + tdc + td
 	} else if (format == "min") {
 		out = "$inc.CallType - $inc.Address$CrossStreet:"
 	} else if (format == "updated") {
@@ -242,7 +254,11 @@ String incidentToStr(Map<String, List> inc, String format) {
 		out = out + " $it"
 	}
 	
-	return out
+	if (format == "table") {
+		return "<tr>" + out + "</tr>"
+	} else {
+		return out
+	}
 }
 
 String incidentsToStr(List<Map> incidents, String format) {
