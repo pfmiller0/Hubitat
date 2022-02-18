@@ -13,7 +13,8 @@ definition(
 	author: "Peter Miller",
 	description: "Retrieve SDFD incidents, and provide notification for local incidents.",
 	iconUrl: "",
-	iconX2Url: ""
+	iconX2Url: "",
+	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/SDFD%20Incident%20Notifier.groovy"
 )
 
 preferences {
