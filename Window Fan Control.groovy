@@ -23,6 +23,7 @@ String appVersion() { return "1.5" }
 definition(
 	name: "Window Fan Control",
 	namespace: "hyposphere.net",
+	parent: "hyposphere.net:P's Utilities",
 	author: "Peter Miller",
 	description: "Compares two temperatures – indoor vs outdoor, to control a window fan",
 	iconUrl: "",
@@ -37,28 +38,36 @@ preferences {
 	section() {
 		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
-	section("Temperature control") {
+	section("<b>Status</b>") {
+		String status = ""
+		if (tempMode == "Auto") {
+			status = status + "Auto mode state: " + state.tempModeActive + "<br>"
+		}
+		if (state.last_msg) {
+			status = status + "Last status: " + state.last_msg + "<br>"
+		}
+		if (status) {
+			paragraph(status)
+		}
+	}
+	section("<b>Temperature control</b>") {
 		input "tempTargetCooling", "decimal", title: "Target temperature (Cooling)", defaultValue: 69
 		input "tempTargetHeating", "decimal", title: "Target temperature (Heating)", defaultValue: 71
-		input "tempMode", "enum", title: "Control mode", options: ["Cooling", "Heating", "Auto"], description: "Enter mode", defaultValue: "Auto"
-        input "tempAfternoonAdjust", "decimal", title: "Afternoon temperature adjustment", defaultValue: 3
-        input "tempHeatAdjust", "decimal", title: "Heating mode temperature adjustment", defaultValue: 3
-        input "tempAutoModeChangeThreshold", "decimal", title: "Auto mode change threshold", defaultValue: 5
+		input "tempMode", "enum", title: "Mode", options: ["Cooling", "Heating", "Auto"], description: "Enter mode", defaultValue: "Auto"
+		input "tempAutoModeChangeThreshold", "decimal", title: "Auto mode change threshold", defaultValue: 5
+		input "tempAfternoonAdjust", "decimal", title: "Afternoon temperature adjustment", defaultValue: 3
+		input "tempHeatAdjust", "decimal", title: "Heating mode temperature adjustment", defaultValue: 3
 	}
 
-	if (tempMode == "Auto") {
-		section("Auto mode state: " + state.tempModeActive) { }
-	}
-
-	section("Devices") {
+	section("<b>Devices</b>") {
 		input "thermoIn", "capability.temperatureMeasurement", title: "Indoor temperature", multiple: true
 		input "thermoOut", "capability.temperatureMeasurement", title: "Outdoor temperature", multiple: true
 		input "switchFans", "capability.switch", title: "Window fans", multiple: true
 		input "windowControl", "capability.contactSensor", title: "Window sensor (disable if open)", required: false, hideWhenEmpty: true
-        input "switchControl", "capability.switch", title: "Thermostat enabled", required: false
+		input "switchControl", "capability.switch", title: "Thermostat enabled", required: false
 	}
 
-	section("Debug") {
+	section("<b>Debug</b>") {
 		input "debugMode", "bool", title: "Enable debug logging", defaultValue: false, submitOnChange: true
 		if (debugMode) {
 			input "tempInDebug", "number", title: "Inside temp override"
@@ -137,9 +146,9 @@ void thermostateOffHandler(evt) {
 }
 
 void temperatureHandler(evt) {
-	Float tempOut = null
-	Float tempIn = null
-	boolean thermostateEnabled = true
+	Float tempOut
+	Float tempIn
+	boolean thermostateEnabled = true	
 
 	// Check for thermostat control override switches
 	if (windowControl != null && windowControl.latestValue("contact") == "open") {
@@ -149,7 +158,7 @@ void temperatureHandler(evt) {
 		logDebug "Thermostat disabled: switched off"
 		thermostateEnabled = false
 	}
-
+		
     // Check for temperature sensors active
 	if (devicesAnyOnline(thermoOut) && devicesAnyOnline(thermoIn)) {
 		if (!debugMode || (tempInDebug == null || tempOutDebug == null)) {
@@ -184,7 +193,7 @@ void temperatureHandler(evt) {
 		}
     } else {
 		// Temperature reading missing, disable thermostat
-		logWarn "Thermostat disabled: Temperature sensors missing"
+		logError "Thermostat disabled: Temperature sensors missing"
 		thermostateEnabled = false
 	}
 
@@ -241,6 +250,7 @@ Pass in the name of the device that triggered the change. If the device is the w
 	// Don't run if already in state
 	if (!switchFans*.latestValue("switch").every { it == newState }) {
 		logInfo msg
+		state.last_msg = msg
 		switchFans.each {
 			if (newState == "on") {
    	 			it.on()
@@ -313,7 +323,7 @@ Float tempAverage(List tempDevices) {
 	return sum / count
 }
 
-boolean devicesAnyOnline(devices) {
+boolean devicesAnyOnline(List devices) {
 	return devices.any { it.getStatus() == "ACTIVE" }
 }
 
