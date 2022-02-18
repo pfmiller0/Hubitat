@@ -7,8 +7,9 @@
 #include hyposphere.net.plib
 
 definition(
-    name: "Switch On-time Tracker",
+    name: "Switch On-Time Tracker",
     namespace: "hyposphere.net",
+	parent: "hyposphere.net:P's Utilities",
     author: "Peter Miller",
     description: "Track how long a switch is turned on.",
     category: "My Apps",
@@ -29,25 +30,24 @@ def mainPage() {
 			input "isPaused", "bool", title: "Pause app", defaultValue: false
 		}
 		section("Settings") {
-			input "switches", "capability.switch", title: "Switches", multiple: false
-			input "notifyDevice", "capability.notification", title: "Notification device", multiple: false, required: false
+			input "switchDev", "capability.switch", title: "Switch", multiple: false
+			input "notifyDev", "capability.notification", title: "Notification device", multiple: false, required: false
 		}
-		section("Time on") {
-			if (state.totalOnTime != null) {
-				paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + printTime(getOnTime()) + "</table>"
-			}
+		if (state.totalOnTime) {
+			section("Time on: <b>" + printTime(getOnTime()) + "</b>") { }
 		}
-		section {
-			href "resetPage", title: "Reset time?", description: ""
+		if (state.notifyTime) {
+			section("Notify after: <b>" + printTime(Math.round(state.notifyTime)) + "</b>") { }
 		}
-	}
-}
-
-def resetPage() {
-	dynamicPage(name: "resetPage", title: "Time has been reset!", install: false, uninstall: false) {
-		state.totalOnTime = 0.0
-		if (switches.latestValue("switch") == "on") {
-			state.turnOnTime = now()
+		
+		section("Reset") {
+	    	if (! state.showReset) {
+				input name: "btnReset", type: "button", title: "Reset counter?"
+			} else {
+				paragraph "Are you sure you want to reset the counter?"
+				input name: "btnCancel", type: "button", title: "No", width: 6
+				input name: "btnConfirm", type: "button", title: "<span style='color:red'>Yes</span>", width: 6
+			}	
 		}
 	}
 }
@@ -61,6 +61,7 @@ void updated() {
 	unsubscribe()
 	initialize()
 	logDebug "Updated: $settings"
+	app.updateLabel(switchDev.getLabel() + " On-Time Tracker")
 }
 
 void initialize() {
@@ -68,8 +69,10 @@ void initialize() {
 		resetAppLabel()
 		
 		state.totalOnTime = state.totalOnTime ? state.totalOnTime : 0.0
+		state.notifyTime = 129600 // 3 months in minutes
+		state.turnOnTime = state.turnOnTime ? state.turnOnTime : now()
 		
-		subscribe(switches, "switch", switchChanged)
+		subscribe(switchDev, "switch", switchChanged)
 		
 		switchChanged()
 	} else {
@@ -78,30 +81,28 @@ void initialize() {
 }
 
 void switchChanged(evt) {
-	THREE_MONTHS = 129600.0 // in minutes
-	
 	//log.debug evt.device.getId()
 	
-	if (switches.latestValue("switch") == "on") {
+	if (switchDev.latestValue("switch") == "on") {
 		state.turnOnTime = now() 
 	} else {
 		state.totalOnTime += (now() - state.turnOnTime)/(1000*60) 
 	}
 	
-	if (state.totalOnTime > THREE_MONTHS) {
-		notifyDevice.deviceNotification "Time to clean the air filter!"
+	if (state.totalOnTime > state.notifyTime) {
+		notifyDev.deviceNotification "Time to clean the air filter!"
 	}	
 }
 
 Integer getOnTime() {
-	if (switches.latestValue("switch") == "on") {
+	if (switchDev.latestValue("switch") == "on") {
 		return Math.round(state.totalOnTime + (now() - state.turnOnTime)/(1000*60))
 	} else {
 		return Math.round(state.totalOnTime)
 	}
 }
 
-String printTime(Integer mins) {
+String printTime(Long mins) {
 	String out=""
 	String td = '<td style="border:1px solid silver;">'
 	String tdc = '</td>'
@@ -116,4 +117,24 @@ String printTime(Integer mins) {
 	out="${days} days, ${hours} hours, ${mins} minutes"
 	
 	return out
+}
+
+void appButtonHandler(String btn) {
+	switch (btn) {
+	case "btnReset":
+		state.showReset = true
+		break
+	case "btnCancel":
+		state.showReset = false
+		break
+	case "btnConfirm":
+		state.totalOnTime = 0.0
+		if (switchDev.latestValue("switch") == "on") {
+			state.turnOnTime = now()
+		}
+		state.showReset = false
+		break
+	default:
+		log.warn "Unhandled button press: $btn"
+	}
 }
