@@ -29,25 +29,28 @@ def mainPage() {
 		section() {
 			input "isPaused", "bool", title: "Pause app", defaultValue: false
 		}
+		
+		if (state.totalOnTime) {
+			section("Time on: <b>" + printTime(getOnTime()) + "</b>") { }
+		
+			if (state.notifyTime) {
+				section("Notify after: <b>" + printTime(Math.round(state.notifyTime)) + "</b>") { }
+			}
+		
+			section("Reset") {
+	    		if (! state.showReset) {
+					input name: "btnReset", type: "button", title: "Reset counter?"
+				} else {
+					paragraph "Are you sure you want to reset the counter?"
+					input name: "btnCancel", type: "button", title: "No", width: 6
+					input name: "btnConfirm", type: "button", title: "<span style='color:red'>Yes</span>", width: 6
+				}	
+			}
+		}	
+
 		section("Settings") {
 			input "switchDev", "capability.switch", title: "Switch", multiple: false
 			input "notifyDev", "capability.notification", title: "Notification device", multiple: false, required: false
-		}
-		if (state.totalOnTime) {
-			section("Time on: <b>" + printTime(getOnTime()) + "</b>") { }
-		}
-		if (state.notifyTime) {
-			section("Notify after: <b>" + printTime(Math.round(state.notifyTime)) + "</b>") { }
-		}
-		
-		section("Reset") {
-	    	if (! state.showReset) {
-				input name: "btnReset", type: "button", title: "Reset counter?"
-			} else {
-				paragraph "Are you sure you want to reset the counter?"
-				input name: "btnCancel", type: "button", title: "No", width: 6
-				input name: "btnConfirm", type: "button", title: "<span style='color:red'>Yes</span>", width: 6
-			}	
 		}
 	}
 }
