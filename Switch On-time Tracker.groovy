@@ -30,12 +30,9 @@ def mainPage() {
 			input "isPaused", "bool", title: "Pause app", defaultValue: false
 		}
 		
-		if (state.totalOnTime) {
+		if (state.notifyTime) {
 			section("Time on: <b>" + printTime(getOnTime()) + "</b>") { }
-		
-			if (state.notifyTime) {
-				section("Notify after: <b>" + printTime(Math.round(state.notifyTime)) + "</b>") { }
-			}
+			section("Notify after: <b>" + printTime(Math.round(state.notifyTime)) + "</b>") { }
 		
 			section("Reset") {
 	    		if (! state.showReset) {
@@ -57,6 +54,7 @@ def mainPage() {
 
 void installed() {
 	initialize()
+	//switchChanged()
 	logDebug "Installed: $settings"
 }
 
@@ -75,9 +73,7 @@ void initialize() {
 		state.notifyTime = 129600 // 3 months in minutes
 		state.turnOnTime = state.turnOnTime ? state.turnOnTime : now()
 		
-		subscribe(switchDev, "switch", switchChanged)
-		
-		switchChanged()
+		subscribe(switchDev, "switch", switchChanged)		
 	} else {
 		addAppLabel("Paused", "red")
 	}
