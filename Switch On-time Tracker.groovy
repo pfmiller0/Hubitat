@@ -7,21 +7,21 @@
 #include hyposphere.net.plib
 
 definition(
-    name: "Switch On-Time Tracker",
-    namespace: "hyposphere.net",
+	name: "Switch On-Time Tracker",
+	namespace: "hyposphere.net",
 	parent: "hyposphere.net:P's Utilities",
-    author: "Peter Miller",
-    description: "Track how long a switch is turned on.",
-    category: "My Apps",
-    iconUrl: "",
-    iconX2Url: "",
-    importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Switch%20On-time%20Tracker.groovy"
+	author: "Peter Miller",
+	description: "Track how long a switch is turned on.",
+	category: "My Apps",
+	iconUrl: "",
+	iconX2Url: "",
+	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Switch%20On-time%20Tracker.groovy"
 )
 
 
 preferences {
 	page(name: "mainPage")
-  	page(name: "resetPage")
+	page(name: "resetPage")
 }
 
 def mainPage() {
