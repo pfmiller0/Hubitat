@@ -31,10 +31,11 @@ metadata {
 			input "search_coords", "text", title: "Search coordinates [lat, long]", required: true, description: "Coordinates at center of sensor search box", defaultValue: "[" + location.latitude + "," + location.longitude + "]"
 			input "search_range", "decimal", title: "Search range", required: true, description: "Size of sensor search box (+/- center of search box coordinates)", defaultValue: 1.5
 			input "unit", "enum", title: "Unit", required: true, options: ["miles", "kilometers"], defaultValue: "miles"
+			input "weighted_avg", "bool", title: "Weighted average", required: true, description: "Calculate device average weighted by distance", defaultValue: true
 		} else {
 			input "sensor_index", "number", title: "Sensor index", required: true, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com", defaultValue: 90905
+			weighted_avg = false
 		}
-		input "weighted_avg", "bool", title: "Weighted average", required: true, description: "Calculate device average weighted by distance", defaultValue: true
 		input "debugMode", "bool", title: "Debug logging", required: true, defaultValue: false
 	}
 }
@@ -140,11 +141,14 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		log.debug "sites: ${sensorData.collect { it[1] }}"
 		log.debug "AQIs: ${sensorData.collect { getPart2_5_AQI( Float.parseFloat(it[2])) }}"
 		log.debug "unweighted av aqi: ${getPart2_5_AQI(sensorAverage(sensorData, 2))}"
-		log.debug "weighted av aqi: ${getPart2_5_AQI(sensorAverage(sensorData, 2, data.coords))}"
+		log.debug "coords: ${data.coords}"
+		if ( weighted_avg && device_search ) {
+			log.debug "weighted av aqi: ${getPart2_5_AQI(sensorAverageWeighted(sensorData, 2, data.coords))}"
+		}
 	}
 	
-	if ( weighted_avg ) {
-		aqiValue = getPart2_5_AQI(sensorAverage(sensorData, 2, data.coords))
+	if ( weighted_avg && device_search) {
+		aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensorData, 2, data.coords))
 	} else {
 		aqiValue = getPart2_5_AQI(sensorAverage(sensorData, 2))
 	}
@@ -179,7 +183,7 @@ Float sensorAverage(def sensors,Integer field) {
 	return sum / count
 }
 
-Float sensorAverage(def sensors, Integer field, Float[] coords) {
+Float sensorAverageWeighted(def sensors, Integer field, Float[] coords) {
 	Float count = 0.0
 	Float sum = 0.0
 	def distances = []
