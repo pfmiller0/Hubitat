@@ -32,6 +32,7 @@ metadata {
 			input "search_range", "decimal", title: "Search range", required: true, description: "Size of sensor search box (+/- center of search box coordinates)", defaultValue: 1.5
 			input "unit", "enum", title: "Unit", required: true, options: ["miles", "kilometers"], defaultValue: "miles"
 			input "weighted_avg", "bool", title: "Weighted average", required: true, description: "Calculate device average weighted by distance", defaultValue: true
+			//input "confidenceThreshold", "number", title: "Confidence threshold", required: true, description: "Filter out measurments below this confidence", range: "0..100", defaultValue: 90
 		} else {
 			input "sensor_index", "number", title: "Sensor index", required: true, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com", defaultValue: 90905
 			weighted_avg = false
@@ -134,11 +135,12 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		return
 	}
 	
-	// log.debug "size: ${resp.getJson().data.size()}"
+	//log.debug "size: ${resp.getJson().data.size()}"
 	
 	if ( device_search ) {
 		// Filter out lower quality devices
-		sensorData = resp.getJson().data.findAll {it[5] > 90 }
+		//sensorData = resp.getJson().data.findAll {it[5] >= (confidenceThreshold as Integer) }
+		sensorData = resp.getJson().data.findAll {it[5] >= 90 }
 	} else {
 		sensorData = resp.getJson().data
 	}
