@@ -23,7 +23,7 @@ metadata {
 
 	preferences {
 		input "X_API_Key", "text", title: "PurpleAir API key", required: true, description: "Contact contact@purpleair.com to request an API key"
-		input "update_interval", "enum", title: "Update interval", required: true, description: "Minutes between updates", options: ["15", "30", "60", "180"], defaultValue: "60"
+		input "update_interval", "enum", title: "Update interval", required: true, description: "Minutes between updates", options: ["1", "5", "15", "30", "60", "180"], defaultValue: "60"
 		input "avg_period", "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: ["pm2.5", "pm2.5_10minute", "pm2.5_30minute", "pm2.5_60minute", "pm2.5_6hour", "pm2.5_24hour", "pm2.5_1week"], defaultValue: "pm2.5_60minute"
 		input "device_search", "bool", title: "Search for devices", required: true, description: "If false specify device index to use", defaultValue: true
 
@@ -60,7 +60,11 @@ def poll() {
 def configure() {
 	unschedule()
 
-	if ( update_interval == "15" ) {
+	if ( update_interval == "1" ) {
+		schedule('0 */1 * ? * *', refresh)
+	} else if ( update_interval == "5" ) {
+		schedule('0 */5 * ? * *', refresh)
+	} else if ( update_interval == "15" ) {
 		runEvery15Minutes(refresh)
 	} else if ( update_interval == "30" ) {
 		runEvery30Minutes(refresh)
