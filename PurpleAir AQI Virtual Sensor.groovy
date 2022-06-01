@@ -134,7 +134,14 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		return
 	}
 	
-	sensorData = resp.getJson().data.findAll {it[5] > 90 }
+	// log.debug "size: ${resp.getJson().data.size()}"
+	
+	if ( device_search ) {
+		// Filter out lower quality devices
+		sensorData = resp.getJson().data.findAll {it[5] > 90 }
+	} else {
+		sensorData = resp.getJson().data
+	}
 	//log.debug sensorData
 
 	if ( debugMode ) {
