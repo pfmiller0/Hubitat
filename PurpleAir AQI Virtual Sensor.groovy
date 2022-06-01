@@ -147,6 +147,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	if ( debugMode ) {
 		log.debug "sites: ${sensorData.collect { it[1] }}"
 		log.debug "AQIs: ${sensorData.collect { getPart2_5_AQI( Float.parseFloat(it[2])) }}"
+		log.debug "confidence: ${sensorData.collect { it[5] }}"
 		log.debug "unweighted av aqi: ${getPart2_5_AQI(sensorAverage(sensorData, 2))}"
 		log.debug "coords: ${data.coords}"
 		if ( weighted_avg && device_search ) {
