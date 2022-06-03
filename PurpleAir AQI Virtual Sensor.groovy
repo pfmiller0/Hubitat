@@ -34,8 +34,8 @@ metadata {
 			input "weighted_avg", "bool", title: "Weighted average", required: true, description: "Calculate device average weighted by distance", defaultValue: true
 			//input "confidenceThreshold", "number", title: "Confidence threshold", required: true, description: "Filter out measurments below this confidence", range: "0..100", defaultValue: 90
 		} else {
+			input "Read_Key", "text", title: "Private key", required: false, description: "Required to access private devices"
 			input "sensor_index", "number", title: "Sensor index", required: true, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com", defaultValue: 90905
-			weighted_avg = false
 		}
 		input "debugMode", "bool", title: "Debug logging", required: true, defaultValue: false
 	}
@@ -107,7 +107,11 @@ void sensorCheck() {
 		}
 		httpQuery = [fields: query_fields, location_type: "0", max_age: 3600, nwlat: coords[0] + range[0], nwlng: coords[1] - range[1], selat: coords[0] - range[0], selng: coords[1] + + range[1]]
 	} else {
-		httpQuery = [fields: query_fields, max_age: 3600, show_only: "$sensor_index"]
+		if ( Read_Key ) {
+			httpQuery = [fields: query_fields, read_key: Read_Key, max_age: 3600, show_only: "$sensor_index"]
+		} else {
+			httpQuery = [fields: query_fields, max_age: 3600, show_only: "$sensor_index"]
+		}
 	}
 
 	Map params = [
