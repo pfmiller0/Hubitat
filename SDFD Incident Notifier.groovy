@@ -72,7 +72,7 @@ void initialize() {
 			state.failCount = state.failCount ? state.failCount : 0
 		}
 
-		schedule('0 */' + updateTime + ' * ? * *', incidentCheck)
+		schedule('0 */' + updateTime + ' * ? * *', 'incidentCheck')
 	}
 }
 
@@ -112,17 +112,18 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	if (resp.getStatus() != 200 ) {	
         if (state.failCount <= 3 ) {
             log.debug "HTTP error: " + resp.getStatus()
+			runIn(state.failCount * updateTime * 60, 'incidentCheck')
             state.failCount++
 		} else if (state.failCount == 4 ) {
-            log.debug "HTTP error: " + resp.getStatus() + " (muting errors, reducing updates)"
-            schedule('0 */' + updateTime * state.failCount + ' * ? * *', incidentCheck)
+            log.debug "HTTP error: " + resp.getStatus() + " (muting further errors)"
+            schedule('0 */' + state.failCount * updateTime + ' * ? * *', 'incidentCheck')
 			state.failCount++
 		}
 		return
 	} else {
         if (state.failCount > 0 ) {
             log.info "HTTP error resolved"
-            schedule('0 */' + updateTime + ' * ? * *', incidentCheck)
+            schedule('0 */' + updateTime + ' * ? * *', 'incidentCheck')
 			state.failCount = 0
 		}
 	}
