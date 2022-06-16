@@ -21,11 +21,14 @@ preferences {
 	section() {
 		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
-	section("Active Incidents:") {
-		if (state.activeIncidents != []) {
-			paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + incidentsToStr(state.activeIncidents, "table") + "</table>"
-		} else {
-			paragraph "<p align='center'>No active incidents</p>"
+	if (state.activeIncidents != null) {
+		section("Active Incidents:") {
+			if (state.activeIncidents != []) {
+				paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%; font-size:90%;">' + incidentsToStr(state.activeIncidents, "table") + "</table>"
+			} else {
+				paragraph "<p align='center'>No active incidents</p>"
+			}
+			paragraph "<p align='right' style='font-size:90%;'><a href='http://hubitat/installedapp/events/${app.id}'>Incident history</a></p>"
 		}
 	}
 	section("Settings") {
@@ -38,8 +41,8 @@ preferences {
 	}
 }
 
-List<String> IGNORE_INC() { ["Medical", "Medical Alert Alarm", "Logistics", "Facilities", "Duty Mechanic", "Carbon Monoxide Alarm", "Page", "Move Up", "STAND BACK HOLD", "CAD Test", "Ringing Alarm", "Elevator Rescue", "Lock in/out", "DMS", "Special Service"] }
-List<String> REDUNDANT_TYPES() { ["Traffic Accidents", "Single Resource", "Single Engine Response", "Hazmat", "TwoEngines", "Advised Incident (misc.)", "MTZ - Vegetaton Inital Attack", "Structure Commercial", "Rescue", "Gaslamp", "Traffic Accident Freeway (NC)", "Nat Gas SING ENG SDGE", "Vehicle vs. Structure", "Alert 1", "Alert 2 Brn/Mont", "Alert 2 Still Alarm"] }
+List<String> IGNORE_INC() { ["Medical", "Medical Alert Alarm", "Advised Incident", "RAP", "Logistics", "Facilities", "Duty Mechanic", "Carbon Monoxide Alarm", "Page", "Move Up", "STAND BACK HOLD", "CAD Test", "Drill", "Ringing Alarm", "Elevator Rescue", "Lock in/out", "DMS", "Special Service", "yGT General Transport"] }
+List<String> REDUNDANT_TYPES() { ["Advised Incident (misc.)", "Alert 1", "Alert 2 Brn/Mont", "Alert 2 Still Alarm", "Fuel in Bilge", "Pump Truck", "Traffic Accidents", "Single Resource", "Single Engine Response", "Hazmat", "TwoEngines", "Medical Multi-casualty", "Vegetation NO Special Response", "MTZ - Vegetaton Inital Attack", "Structure Commercial", "Rescue", "Gaslamp", "Traffic Accident Freeway (NC)", "Nat Gas Leak BB", "Nat Gas SING ENG SDGE", "Vehicle vs. Structure"] }
 //List<String> NO_NOTIFICATION_TYPES() { ["Vehicle fire freeway", "Ringing alarm highrise", "Traffic Accident FWY", "Extinguished fire"] }
 List<String> AMBULANCE_UNITS() { ["M", "AM", "BLS", "Sdge"] }
 	
@@ -62,10 +65,11 @@ void updated() {
 void initialize() {
 	if (isPaused == false) {
 		if (debugMode) {
-			state.prevIncNum = "AA00000000"
+			state.prevIncNum = "FS00000000"
 			state.activeIncidents = []
 		} else {
-			state.prevIncNum = state.prevIncNum ? state.prevIncNum : "AA00000000"
+			state.prevIncNum = state.prevIncNum ? state.prevIncNum : "FS00000000"
+			state.failCount = state.failCount ? state.failCount : 0
 		}
 
 		schedule('0 */' + updateTime + ' * ? * *', incidentCheck)
@@ -105,9 +109,22 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	List<Map> updatedActiveIncidents = []
 	String newMaxIncNum = ""
 
-	if (resp.getStatus() != 200 ) {
-		log.debug "HTTP error: " + resp.getStatus()
+	if (resp.getStatus() != 200 ) {	
+        if (state.failCount <= 3 ) {
+            log.debug "HTTP error: " + resp.getStatus()
+            state.failCount++
+		} else if (state.failCount == 4 ) {
+            log.debug "HTTP error: " + resp.getStatus() + " (muting errors, reducing updates)"
+            schedule('0 */' + updateTime * state.failCount + ' * ? * *', incidentCheck)
+			state.failCount++
+		}
 		return
+	} else {
+        if (state.failCount > 0 ) {
+            log.info "HTTP error resolved"
+            schedule('0 */' + updateTime + ' * ? * *', incidentCheck)
+			state.failCount = 0
+		}
 	}
 
 	allIncidents = filterIncidentType(cleanupList(resp.getJson()), IGNORE_INC())
