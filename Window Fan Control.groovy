@@ -40,11 +40,11 @@ preferences {
 	}
 	section("<b>Status</b>") {
 		String status = ""
-		if (tempMode == "Auto") {
-			status = status + "Auto mode state: " + state.tempModeActive + "<br>"
-		}
 		if (state.last_msg) {
 			status = status + "Last status: " + state.last_msg + "<br>"
+		}
+		if (tempMode == "Auto") {
+			status = status + "Auto mode state: " + state.tempModeActive + "<br>"
 		}
 		if (status) {
 			paragraph(status)
@@ -94,14 +94,16 @@ void initialize() {
 		state.timeLastChange = state.timeLastChange ? state.timeLastChange : 0
 		state.tempModeActive = state.tempModeActive ? state.tempModeActive : "Cooling"
 		
-		subscribe(thermoOut, "temperature", temperatureHandler)
-		subscribe(thermoIn, "temperature", temperatureHandler)
+		subscribe(thermoOut, "temperature", 'temperatureHandler')
+		subscribe(thermoIn, "temperature", 'temperatureHandler')
 
-		subscribe(windowControl, "contact.closed", closedWindow)
-		subscribe(windowControl, "contact.open", openedWindow)
-		subscribe(switchControl, "switch.on", temperatureHandler)
-		subscribe(switchControl, "switch.off", thermostateOffHandler)
-		subscribe(switchFans, "switch", fanChange)
+		subscribe(windowControl, "contact.closed", 'temperatureHandler')
+		subscribe(switchControl, "switch.on", 'temperatureHandler')
+		
+		subscribe(switchControl, "switch.off", 'thermostateOffHandler')
+		subscribe(windowControl, "contact.open", 'thermostateOffHandler')
+		
+		subscribe(switchFans, "switch", 'fanChange')
 		
 		temperatureHandler()
 	} else {
@@ -126,23 +128,22 @@ void addAppLabel(String labelNote, String color) {
 	app.updateLabel(app.getLabel() + labelTag)
 }
 
-void openedWindow(evt) {
-	if (switchControl != null && switchControl.latestValue("switch") == "off") {
-		logInfo "Thermostat is disabled, ignoring window"
-	} else {
-		changeFanState("off", "Windows has been opened. Turning off fan")
-		addAppLabel("Window open", "red")
-	}
-}
-
-void closedWindow(evt) {
-	resetAppLabel()
-	temperatureHandler(evt)
-}
-
 void thermostateOffHandler(evt) {
-	changeFanState("off", "Thermostat disabled. Turning off fan")
-	addAppLabel("Thermostat off", "red")
+	String evtDevID = evt.device.getDeviceNetworkId()
+	
+	if (evtDevID == switchControl?.getDeviceNetworkId() ) {
+		changeFanState("off", "Thermostat disabled. Turning off fan")
+		addAppLabel("Thermostat off", "red")
+	} else if (evtDevID == windowControl?.getDeviceNetworkId() ) {
+		if (switchControl?.latestValue("switch") == "off") {
+			logInfo "Thermostat is disabled, ignoring window"
+		} else {
+			changeFanState("off", "Windows has been opened. Turning off fan")
+			addAppLabel("Window open", "red")
+		}
+	} else {
+		logError "${evt.Name} doesn't match known devices"
+	}
 }
 
 void temperatureHandler(evt) {
@@ -151,12 +152,14 @@ void temperatureHandler(evt) {
 	boolean thermostateEnabled = true	
 
 	// Check for thermostat control override switches
-	if (windowControl != null && windowControl.latestValue("contact") == "open") {
+	if (windowControl?.latestValue("contact") == "open") {
 		logDebug "Thermostat disabled: Window open"
 		thermostateEnabled = false
-	} else if (switchControl != null && switchControl.latestValue("switch") == "off") {
+	} else if (switchControl?.latestValue("switch") == "off") {
 		logDebug "Thermostat disabled: switched off"
 		thermostateEnabled = false
+	} else {
+		logDebug "Thermostat enabled: switches all on"
 	}
 		
     // Check for temperature sensors active
@@ -212,9 +215,9 @@ void temperatureHandler(evt) {
 			if (tempOut <= tempIn) { // Not hotter out, check inside temperature
 			// Cases for temperatures
 				if (tempIn < tempTargetCooling) {
-					changeFanState("off", "Too cool, turning fan off (in: $tempIn; out: $tempOut; target: $tempTargetCooling)")
+					changeFanState("off", "Cooling: Too cool in, turning fan off (in: $tempIn; out: $tempOut; target: $tempTargetCooling)")
 				} else if (tempIn > tempTargetCooling) {
-					changeFanState("on", "Turning fan on to cool (in: $tempIn; out: $tempOut; target: $tempTargetCooling)")
+					changeFanState("on", "Cooling: Turning fan on (in: $tempIn; out: $tempOut; target: $tempTargetCooling)")
 				} else {
 					logDebug "Do nothing: $tempIn is at target (in: $tempIn; out: $tempOut; target: $tempTargetCooling)"
 				}
@@ -227,9 +230,9 @@ void temperatureHandler(evt) {
 			if (tempOut >= tempIn) { // Not cooler out, check inside temperature
 			// Cases for temperatures
 				if (tempIn > tempTargetHeating) {
-					changeFanState("off", "Too warm, turning fan off (in: $tempIn; out: $tempOut; target: $tempTargetHeating)")
+					changeFanState("off", "Heating: Too warm in, turning fan off (in: $tempIn; out: $tempOut; target: $tempTargetHeating)")
 				} else if (tempIn < tempTargetHeating) {
-					changeFanState("on", "Turning fan on to warm (in: $tempIn; out: $tempOut; target: $tempTargetHeating)")
+					changeFanState("on", "Heating: Turning fan on (in: $tempIn; out: $tempOut; target: $tempTargetHeating)")
 				} else {
 					logDebug "Do nothing: $tempIn is at target (in: $tempIn; out: $tempOut; target: $tempTargetHeating)"
 				}
