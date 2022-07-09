@@ -152,14 +152,15 @@ void temperatureHandler(evt) {
 	boolean thermostateEnabled = true	
 
 	// Check for thermostat control override switches
-	if (windowControl?.latestValue("contact") == "open") {
-		logDebug "Thermostat disabled: Window open"
-		thermostateEnabled = false
-	} else if (switchControl?.latestValue("switch") == "off") {
+	if (switchControl?.latestValue("switch") == "off") {
 		logDebug "Thermostat disabled: switched off"
+		thermostateEnabled = false
+	} else if (windowControl?.latestValue("contact") == "open") {
+		logDebug "Thermostat disabled: Window open"
 		thermostateEnabled = false
 	} else {
 		logDebug "Thermostat enabled: switches all on"
+		resetAppLabel()
 	}
 		
     // Check for temperature sensors active
@@ -202,7 +203,6 @@ void temperatureHandler(evt) {
 
 	// If windowControl or switchControl are null, continue. Otherwise, check if they are off.
 	if (thermostateEnabled) {
-		resetAppLabel()
 		if (state.tempModeActive == "Cooling") {
 			// If in the later afternoon, subtract a couple degrees as the thermometer cools off slower than the air.
 			Date timeLateAfternoonStart = percentDaylightTime("sunset", 0.28)
