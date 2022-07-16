@@ -32,6 +32,7 @@ metadata {
 		
 		attribute "dewpoint", "number"
 		attribute "battery", "number"
+		attribute "batteryVoltage", "number"
 		
 		fingerprint profileId: "0104", inClusters: "0000,0001,0402,0405", outClusters: "0019", manufacturer: "_TZ2000_a476raq2", model :"TS0201", deviceJoinName: "Tuneway Tuya Temp & Humidity Sensor" // 0x0019: OTA_CLUSTER
 	}
@@ -63,7 +64,7 @@ def parse(String description) {
 		}
 	} else if (map.name == "temperature") {
 		if (tempOffset) {
-			map.value = new BigDecimal((map.value as float) + (tempOffset as float)).setScale(1, BigDecimal.ROUND_HALF_UP)
+			map.value = new BigDecimal((map.value as Float) + (tempOffset as Float)).setScale(2, BigDecimal.ROUND_HALF_UP)
 		}
 		map.descriptionText = temperatureScale == 'C' ? "${device.displayName} was ${map.value}°C" : "${device.displayName} temperature is ${map.value}°F"
 		map.translatable = true
@@ -71,6 +72,11 @@ def parse(String description) {
 		map.value = Math.round(map.value)
 		map.unit = "%"
 		map.descriptionText = "${device.displayName} battery level is ${map.value}%"
+		map.translatable = true
+	} else if (map.name == "batteryVoltage") {
+		map.value = Math.round(map.value)
+		map.unit = "V"
+		map.descriptionText = "${device.displayName} battery voltage is ${map.value}V"
 		map.translatable = true
 	}
 
@@ -93,19 +99,19 @@ def parse(String description) {
 }
 
 // Calculate humidity (from Konke ZigBee Temperture Humidity Sensor driver)
-private parseHumidity(valueHex) {
-	float humidity = Integer.parseInt(valueHex,16)/100
+private parseHumidity(String valueHex) {
+	Float humidity = Integer.parseInt(valueHex,16)/100
 	//logDebug ("Raw reported humidity = ${humidity}, date = ${valueHex}")
-	humidity = humidityOffset ? (humidity + (humidityOffset as float)) : humidity
+	humidity = humidityOffset ? (humidity + (humidityOffset as Float)) : humidity
 	return [
 		name: 'humidity',
-		value: (int) humidity.round(),
+		value: (Integer) humidity.round(),
 		unit: "%",
 		descriptionText: "${device.displayName} humidity is ${humidity.round()}%"
 	]
 }
 
-private Map getDewPoint(float temp, float humidity) {
+private Map getDewPoint(Float temp, Float humidity) {
 	def result = [:]
 	def dp = 0.0
 	def unit = ""
@@ -115,7 +121,7 @@ private Map getDewPoint(float temp, float humidity) {
 		unit = "F"
 	} else {
 		dp = temp - (100 - humidity) / 5
-		umit = "C"
+		unit = "C"
 	}
 	
 	result.value = Math.round(dp)
