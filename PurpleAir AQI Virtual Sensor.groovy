@@ -24,7 +24,7 @@ metadata {
 	preferences {
 		input "X_API_Key", "text", title: "PurpleAir API key", required: true, description: "Contact contact@purpleair.com to request an API key"
 		input "update_interval", "enum", title: "Update interval", required: true, description: "Minutes between updates", options: ["1", "5", "10", "15", "30", "60", "180"], defaultValue: "60"
-		input "avg_period", "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: ["pm2.5", "pm2.5_10minute", "pm2.5_30minute", "pm2.5_60minute", "pm2.5_6hour", "pm2.5_24hour", "pm2.5_1week"], defaultValue: "pm2.5_60minute"
+		input "avg_period", "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: [["pm2.5":"1 min"], ["pm2.5_10minute":"10 mins"], ["pm2.5_30minute":"30 mins"], ["pm2.5_60minute":"1 hour"], ["pm2.5_6hour":"6 hours"], ["pm2.5_24hour":"1 day"], ["pm2.5_1week":"1 week"]], defaultValue: "pm2.5_60minute"
 		input "device_search", "bool", title: "Search for devices", required: true, description: "If false specify device index to use", defaultValue: true
 
 		if ( device_search ) {
@@ -61,21 +61,21 @@ def configure() {
 	unschedule()
 
 	if ( update_interval == "1" ) {
-		schedule('0 */1 * ? * *', refresh)
+		schedule('0 */1 * ? * *', 'refresh')
 	} else if ( update_interval == "5" ) {
-		schedule('0 */5 * ? * *', refresh)
+		schedule('0 */5 * ? * *', 'refresh')
 	} else if ( update_interval == "10" ) {
-		schedule('0 */10 * ? * *', refresh)
+		schedule('0 */10 * ? * *', 'refresh')
 	} else if ( update_interval == "15" ) {
-		runEvery15Minutes(refresh)
+		runEvery15Minutes('refresh')
 	} else if ( update_interval == "30" ) {
-		runEvery30Minutes(refresh)
+		runEvery30Minutes('refresh')
 	} else if ( update_interval == "60" ) {
-		runEvery1Hour(refresh)
+		runEvery1Hour('refresh')
 	} else if ( update_interval == "180" ) {
-		runEvery3Hours(refresh)
+		runEvery3Hours('refresh')
 	} else {
-		runEvery1Hour(refresh)
+		runEvery1Hour('refresh')
 	}
 }
 
@@ -108,9 +108,9 @@ void sensorCheck() {
 		httpQuery = [fields: query_fields, location_type: "0", max_age: 3600, nwlat: coords[0] + range[0], nwlng: coords[1] - range[1], selat: coords[0] - range[0], selng: coords[1] + + range[1]]
 	} else {
 		if ( Read_Key ) {
-			httpQuery = [fields: query_fields, read_key: Read_Key, max_age: 3600, show_only: "$sensor_index"]
+			httpQuery = [fields: query_fields, read_key: Read_Key, show_only: "$sensor_index"]
 		} else {
-			httpQuery = [fields: query_fields, max_age: 3600, show_only: "$sensor_index"]
+			httpQuery = [fields: query_fields, show_only: "$sensor_index"]
 		}
 	}
 
