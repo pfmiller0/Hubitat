@@ -87,6 +87,12 @@ def uninstalled() {
 	unschedule()
 }
 
+Integer respFields(String field) {
+	Map fields = [sensor_index: 0, name: 1, latitude: 2, longitude: 3, confidence: 4, sensor_reading: 5]
+	
+	return fields[field]
+}
+
 void sensorCheck() {
 	String url="https://api.purpleair.com/v1/sensors"
 	String query_fields="name,${avg_period},latitude,longitude,confidence"
@@ -124,7 +130,9 @@ void sensorCheck() {
 		ignoreSSLIssues: true
 	]
 
-	//log.debug "params: $params"
+	if ( debugMode ) {
+		log.debug "params: $params"
+	}
 
 	try {
 		asynchttpGet('httpResponse', params, [coords: coords])
@@ -145,37 +153,39 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		return
 	}
 	
-	//log.debug "size: ${resp.getJson().data.size()}"
+	if ( debugMode ) {
+		log.debug "size: ${resp.getJson().data.size()}"
+	}
 	
 	if ( device_search ) {
 		// Filter out lower quality devices
-		//sensorData = resp.getJson().data.findAll {it[5] >= (confidenceThreshold as Integer) }
-		sensorData = resp.getJson().data.findAll {it[5] >= 90 }
+		//sensorData = resp.getJson().data.findAll {it[respFields("confidence")] >= (confidenceThreshold as Integer) }
+		sensorData = resp.getJson().data.findAll {it[respFields("confidence")] >= 90 }
 	} else {
 		sensorData = resp.getJson().data
 	}
-	//log.debug sensorData
-
+	
 	if ( debugMode ) {
-		log.debug "sites: ${sensorData.collect { it[1] }}"
-		log.debug "AQIs: ${sensorData.collect { getPart2_5_AQI( Float.parseFloat(it[2])) }}"
-		log.debug "confidence: ${sensorData.collect { it[5] }}"
-		log.debug "unweighted av aqi: ${getPart2_5_AQI(sensorAverage(sensorData, 2))}"
+		log.debug "resp: ${sensorData}"
+		log.debug "sites: ${sensorData.collect { it[respFields("name")] }}"
+		log.debug "AQIs: ${sensorData.collect { getPart2_5_AQI( Float.parseFloat(it[respFields("sensor_reading")])) }}"
+		log.debug "confidence: ${sensorData.collect { it[respFields("confidence")] }}"
+		log.debug "unweighted av aqi: ${getPart2_5_AQI(sensorAverage(sensorData))}"
 		log.debug "coords: ${data.coords}"
 		if ( weighted_avg && device_search ) {
-			log.debug "weighted av aqi: ${getPart2_5_AQI(sensorAverageWeighted(sensorData, 2, data.coords))}"
+			log.debug "weighted av aqi: ${getPart2_5_AQI(sensorAverageWeighted(sensorData, data.coords))}"
 		}
 	}
 	
 	if ( weighted_avg && device_search) {
-		aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensorData, 2, data.coords))
+		aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensorData, data.coords))
 	} else {
-		aqiValue = getPart2_5_AQI(sensorAverage(sensorData, 2))
+		aqiValue = getPart2_5_AQI(sensorAverage(sensorData))
 	}
 	
 	AQIcategory = getCategory(aqiValue)
 	
-	sites = sensorData.collect { it[1] }.sort()
+	sites = sensorData.collect { it[respFields("name")] }.sort()
 	//sites = sites.substring(1, sites.length() - 1) // Remove brackets around sites?
 	
 	if ( sensorData.size() == 0 ) {
@@ -192,18 +202,18 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	}
 }
 
-Float sensorAverage(def sensors,Integer field) {
+Float sensorAverage(def sensors) {
 	Integer count = 0
 	Float sum = 0
     
 	sensors.each {
-		sum = sum + Float.valueOf(it[field])
+		sum = sum + Float.valueOf(it[respFields("sensor_reading")])
 		count = count + 1
 	}
 	return sum / count
 }
 
-Float sensorAverageWeighted(def sensors, Integer field, Float[] coords) {
+Float sensorAverageWeighted(def sensors, Float[] coords) {
 	Float count = 0.0
 	Float sum = 0.0
 	def distances = []
@@ -211,12 +221,12 @@ Float sensorAverageWeighted(def sensors, Integer field, Float[] coords) {
     
 	// Weighted average. First find nearest sensor. Then divide sensors distances by nearest distance to get weights.
 	sensors.each {
-		distances.add(Float.valueOf(distance(coords, [Float.valueOf(it[3]), Float.valueOf(it[4])])))
+		distances.add(Float.valueOf(distance(coords, [Float.valueOf(it[respFields("latitude")]), Float.valueOf(it[respFields("longitude")])])))
 	}
 	nearest = distances.min()
 	
 	sensors.eachWithIndex { it, i ->
-	   	Float val = Float.valueOf(it[field])
+	   	Float val = Float.valueOf(it[respFields("sensor_reading")])
 	   	Float weight = nearest / distances[i]
 		sum = sum + val * weight
 	   	count = count + weight
