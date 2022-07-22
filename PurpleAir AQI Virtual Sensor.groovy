@@ -103,13 +103,11 @@ void sensorCheck() {
 		coords = parseJson(search_coords)
 		Float[] dist2deg = distance2degrees(coords[0])
 		Float[] range = []
-		
-		//log.debug getCategory(search_range)
-
+				
 		if ( unit == "miles" ) {
-			range = [(search_range as Float)/dist2deg[0], (search_range as Float)/dist2deg[1]]
+			range = [search_range/dist2deg[0], search_range/dist2deg[1]]
 		} else { // Convert to km
-			range = [((search_range as Float)/1.609)/dist2deg[0], ((search_range as Float)/1.609)/dist2deg[1]]
+			range = [(search_range/1.609)/dist2deg[0], (search_range/1.609)/dist2deg[1]]
 		}
 		httpQuery = [fields: query_fields, location_type: "0", max_age: 3600, nwlat: coords[0] + range[0], nwlng: coords[1] - range[1], selat: coords[0] - range[0], selng: coords[1] + + range[1]]
 	} else {
@@ -130,9 +128,7 @@ void sensorCheck() {
 		ignoreSSLIssues: true
 	]
 
-	if ( debugMode ) {
-		log.debug "params: $params"
-	}
+	if ( debugMode ) log.debug "params: $params"
 
 	try {
 		asynchttpGet('httpResponse', params, [coords: coords])
