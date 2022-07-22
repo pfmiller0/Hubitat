@@ -87,9 +87,9 @@ def uninstalled() {
 	unschedule()
 }
 
+
 Integer respFields(String field) {
-	Map fields = [sensor_index: 0, name: 1, latitude: 2, longitude: 3, confidence: 4, sensor_reading: 5]
-	
+	Map fields = [sensor_index: 0, name: 1, latitude: 2, longitude: 3, confidence: 4, (avg_period): 5]
 	return fields[field]
 }
 
@@ -152,10 +152,8 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		log.error "HTTP error from PurpleAir: " + resp.getStatus()
 		return
 	}
-	
-	if ( debugMode ) {
-		log.debug "size: ${resp.getJson().data.size()}"
-	}
+
+	if ( debugMode ) log.debug "size: ${resp.getJson().data.size()}"
 	
 	if ( device_search ) {
 		// Filter out lower quality devices
@@ -168,7 +166,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	if ( debugMode ) {
 		log.debug "resp: ${sensorData}"
 		log.debug "sites: ${sensorData.collect { it[respFields("name")] }}"
-		log.debug "AQIs: ${sensorData.collect { getPart2_5_AQI( Float.parseFloat(it[respFields("sensor_reading")])) }}"
+		log.debug "AQIs: ${sensorData.collect { getPart2_5_AQI( Float.parseFloat(it[respFields(avg_period)])) }}"
 		log.debug "confidence: ${sensorData.collect { it[respFields("confidence")] }}"
 		log.debug "unweighted av aqi: ${getPart2_5_AQI(sensorAverage(sensorData))}"
 		log.debug "coords: ${data.coords}"
@@ -202,31 +200,31 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	}
 }
 
-Float sensorAverage(def sensors) {
+Float sensorAverage(String[][] sensors) {
 	Integer count = 0
 	Float sum = 0
     
 	sensors.each {
-		sum = sum + Float.valueOf(it[respFields("sensor_reading")])
+		sum = sum + Float.valueOf(it[respFields(avg_period)])
 		count = count + 1
 	}
 	return sum / count
 }
 
-Float sensorAverageWeighted(def sensors, Float[] coords) {
+Float sensorAverageWeighted(String[][] sensors, Float[] coords) {
 	Float count = 0.0
 	Float sum = 0.0
-	def distances = []
+	ArrayList distances = []
 	Float nearest = 0.0
-    
+	
 	// Weighted average. First find nearest sensor. Then divide sensors distances by nearest distance to get weights.
 	sensors.each {
-		distances.add(Float.valueOf(distance(coords, [Float.valueOf(it[respFields("latitude")]), Float.valueOf(it[respFields("longitude")])])))
+		distances.add(distance(coords, [Float.valueOf(it[respFields("latitude")]), Float.valueOf(it[respFields("longitude")])]))
 	}
 	nearest = distances.min()
 	
 	sensors.eachWithIndex { it, i ->
-	   	Float val = Float.valueOf(it[respFields("sensor_reading")])
+	   	Float val = Float.valueOf(it[respFields(avg_period)])
 	   	Float weight = nearest / distances[i]
 		sum = sum + val * weight
 	   	count = count + weight
