@@ -162,8 +162,8 @@ void temperatureHandler(evt) {
 		logDebug "Thermostat enabled: switches all on"
 		resetAppLabel()
 	}
-		
-    // Check for temperature sensors active
+
+	// Check for temperature sensors active
 	if (devicesAnyOnline(thermoOut) && devicesAnyOnline(thermoIn)) {
 		if (!debugMode || (tempInDebug == null || tempOutDebug == null)) {
 			tempOut = tempRound(tempAverage(thermoOut))
@@ -291,16 +291,16 @@ Date percentDaylightTime (String SunriseOrSunset, Float timePercent) {
 }
 
 void fanChange(evt) {
-	Integer lastChangeHrs
-	Integer lastChangeMin
+	String lastChangeHrs
+	String lastChangeMin
 	
 	// Can we use the built in time since last fan state change?
 	//     fan.currentState("motion").date.time
 	
-	lastChangeHrs = Math.floor(minutesSinceLastChange() / 60)
-	lastChangeMin = minutesSinceLastChange() % 60
+	lastChangeHrs = "${Math.floor(minutesSinceLastChange() / 60) as Integer}"
+	lastChangeMin = "${minutesSinceLastChange() % 60 as Integer}"
 	
-	logInfo "Fan state changed ($lastChangeHrs:$lastChangeMin hours since last change)"
+	logInfo "Fan state changed ($lastChangeHrs:${lastChangeMin.padLeft(2, '0')} since last change)"
 	state.timeLastChange = now()
 }
 
