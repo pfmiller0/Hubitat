@@ -4,6 +4,9 @@
  *  PurpleAir sensor map: https://map.purpleair.com/
  *  API documentation: https://api.purpleair.com/ 
  */
+
+import groovy.transform.Field
+
 metadata {
 	definition (
 		name: "PurpleAir AQI Virtual Sensor",
@@ -23,7 +26,7 @@ metadata {
 
 	preferences {
 		input "X_API_Key", "text", title: "PurpleAir API key", required: true, description: "Contact contact@purpleair.com to request an API key"
-		input "update_interval", "enum", title: "Update interval", required: true, description: "Minutes between updates", options: ["1", "5", "10", "15", "30", "60", "180"], defaultValue: "60"
+		input "update_interval", "enum", title: "Update interval", required: true, options: [["1": "1 min"], ["5": "5 min"], ["10": "10 min"], ["15": "15 min"], ["30": "30 min"], ["60": "1 hr"], ["180": "3 hr"]], defaultValue: "60"
 		input "avg_period", "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: [["pm2.5":"1 min"], ["pm2.5_10minute":"10 mins"], ["pm2.5_30minute":"30 mins"], ["pm2.5_60minute":"1 hour"], ["pm2.5_6hour":"6 hours"], ["pm2.5_24hour":"1 day"], ["pm2.5_1week":"1 week"]], defaultValue: "pm2.5_60minute"
 		input "device_search", "bool", title: "Search for devices", required: true, description: "If false specify device index to use", defaultValue: true
 
@@ -41,6 +44,8 @@ metadata {
 	}
 }
 
+@Field Map RESPONSE_FIELDS = [:]
+
 // Parse events into attributes. Required for device drivers but not used
 def parse(String description) {
 	log.debug("IQAir: Parsing '${description}'")
@@ -53,13 +58,14 @@ def installed() {
 def refresh() {
 	sensorCheck()
 }
+
 def poll() {
 	sensorCheck()
 }
 
 def configure() {
 	unschedule()
-
+	
 	if ( update_interval == "1" ) {
 		schedule('0 */1 * ? * *', 'refresh')
 	} else if ( update_interval == "5" ) {
@@ -75,6 +81,7 @@ def configure() {
 	} else if ( update_interval == "180" ) {
 		runEvery3Hours('refresh')
 	} else {
+		log.error "Invalid update_interval"
 		runEvery1Hour('refresh')
 	}
 }
@@ -85,12 +92,6 @@ def updated() {
 
 def uninstalled() {
 	unschedule()
-}
-
-
-Integer respFields(String field) {
-	Map fields = [sensor_index: 0, name: 1, latitude: 2, longitude: 3, confidence: 4, (avg_period): 5]
-	return fields[field]
 }
 
 void sensorCheck() {
@@ -151,20 +152,23 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 
 	if ( debugMode ) log.debug "size: ${resp.getJson().data.size()}"
 	
+	// Set field lookup map
+	resp.getJson().fields.eachWithIndex{it,index-> RESPONSE_FIELDS[(it)] = index}
+	
 	if ( device_search ) {
 		// Filter out lower quality devices
-		//sensorData = resp.getJson().data.findAll {it[respFields("confidence")] >= (confidenceThreshold as Integer) }
-		sensorData = resp.getJson().data.findAll {it[respFields("confidence")] >= 90 }
+		//sensorData = resp.getJson().data.findAll {it[RESPONSE_FIELDS["confidence"]] >= (confidenceThreshold as Integer) }
+		sensorData = resp.getJson().data.findAll {it[RESPONSE_FIELDS["confidence"]] >= 90}
 	} else {
 		sensorData = resp.getJson().data
 	}
 	
 	if ( debugMode ) {
 		log.debug "resp: ${sensorData}"
-		log.debug "sites: ${sensorData.collect { it[respFields("name")] }}"
-		log.debug "AQIs: ${sensorData.collect { getPart2_5_AQI( Float.parseFloat(it[respFields(avg_period)])) }}"
-		log.debug "confidence: ${sensorData.collect { it[respFields("confidence")] }}"
-		log.debug "unweighted av aqi: ${getPart2_5_AQI(sensorAverage(sensorData))}"
+		log.debug "sites: ${sensorData.collect { it[RESPONSE_FIELDS["name"]] }}"
+		log.debug "AQIs: ${sensorData.collect { getPart2_5_AQI( Float.parseFloat(it[RESPONSE_FIELDS[avg_period]])) }}"
+		log.debug "confidence: ${sensorData.collect { it[RESPONSE_FIELDS["confidence"]] }}"
+		log.debug "unweighted av aqi: ${getPart2_5_AQI(RESPONSE_FIELDS[sensorData])}"
 		log.debug "coords: ${data.coords}"
 		if ( weighted_avg && device_search ) {
 			log.debug "weighted av aqi: ${getPart2_5_AQI(sensorAverageWeighted(sensorData, data.coords))}"
@@ -179,7 +183,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	
 	AQIcategory = getCategory(aqiValue)
 	
-	sites = sensorData.collect { it[respFields("name")] }.sort()
+	sites = sensorData.collect { it[RESPONSE_FIELDS["name"]] }.sort()
 	//sites = sites.substring(1, sites.length() - 1) // Remove brackets around sites?
 	
 	if ( sensorData.size() == 0 ) {
@@ -201,7 +205,7 @@ Float sensorAverage(String[][] sensors) {
 	Float sum = 0
     
 	sensors.each {
-		sum = sum + Float.valueOf(it[respFields(avg_period)])
+		sum = sum + Float.valueOf(it[RESPONSE_FIELDS[avg_period]])
 		count = count + 1
 	}
 	return sum / count
@@ -215,12 +219,12 @@ Float sensorAverageWeighted(String[][] sensors, Float[] coords) {
 	
 	// Weighted average. First find nearest sensor. Then divide sensors distances by nearest distance to get weights.
 	sensors.each {
-		distances.add(distance(coords, [Float.valueOf(it[respFields("latitude")]), Float.valueOf(it[respFields("longitude")])]))
+		distances.add(distance(coords, [Float.valueOf(it[RESPONSE_FIELDS["latitude"]]), Float.valueOf(it[RESPONSE_FIELDS["longitude"]])]))
 	}
 	nearest = distances.min()
 	
 	sensors.eachWithIndex { it, i ->
-	   	Float val = Float.valueOf(it[respFields(avg_period)])
+	   	Float val = Float.valueOf(it[RESPONSE_FIELDS[avg_period]])
 	   	Float weight = nearest / distances[i]
 		sum = sum + val * weight
 	   	count = count + weight
