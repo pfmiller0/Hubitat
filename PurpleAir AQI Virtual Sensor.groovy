@@ -65,6 +65,10 @@ def poll() {
 
 def configure() {
 	unschedule()
+
+	//state.failCount = state.failCount ? state.failCount : 0
+	
+	//log.debug "update_interval: ${update_interval}"
 	
 	if ( update_interval == "1" ) {
 		schedule('0 */1 * ? * *', 'refresh')
@@ -145,11 +149,36 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	String[][] sensorData
 	String sites
 	
+	/***/
 	if (resp.getStatus() != 200 ) {
 		log.error "HTTP error from PurpleAir: " + resp.getStatus()
 		return
 	}
-
+	/***
+	if (resp.getStatus() != 200 ) {	
+        state.failCount++
+		unschedule('refresh')
+		if (state.failCount <= 4 ) {
+            log.debug "HTTP error from PurpleAir: " + resp.getStatus()
+			runIn(Integer.valueOf(update_interval) * state.failCount * 60, 'refresh')
+		} else if (state.failCount == 5 ) {
+            log.debug "HTTP error from PurpleAir: " + resp.getStatus() + " (muting errors)"
+			runIn(Integer.valueOf(update_interval * state.failCount) * 60, 'refresh')
+		} else {
+			runIn(Integer.valueOf(update_interval) * 6 * 60, 'refresh')
+		}
+		return
+	} else {
+        if (state.failCount > 0 ) {
+			if (state.failCount >= 5 ) {
+				log.info "HTTP error from PurpleAir resolved ($state.failCount)"
+            }
+            state.failCount = 0
+			configure()
+		}
+	}
+	/***/
+	
 	if ( debugMode ) log.debug "size: ${resp.getJson().data.size()}"
 	
 	// Set field lookup map
