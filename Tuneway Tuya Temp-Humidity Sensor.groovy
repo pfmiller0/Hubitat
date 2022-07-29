@@ -99,7 +99,7 @@ def parse(String description) {
 }
 
 // Calculate humidity (from Konke ZigBee Temperture Humidity Sensor driver)
-private parseHumidity(String valueHex) {
+private Map parseHumidity(String valueHex) {
 	Float humidity = Integer.parseInt(valueHex,16)/100
 	//logDebug ("Raw reported humidity = ${humidity}, date = ${valueHex}")
 	humidity = humidityOffset ? (humidity + (humidityOffset as Float)) : humidity
@@ -112,15 +112,22 @@ private parseHumidity(String valueHex) {
 }
 
 private Map getDewPoint(Float temp, Float humidity) {
-	def result = [:]
-	def dp = 0.0
-	def unit = ""
+	Map result = [:]
+	Float dp = 0.0
+	String unit = ""
 	
 	if (location.temperatureScale == "F") {
 		dp = temp - (9/25) * (100 - humidity)
+		Float tempC = fahrenheitToCelsius(temp)
+		Float dpMagnus = celsiusToFahrenheit(243.04*(Math.log(humidity/100)+((17.625*tempC)/(243.04+tempC)))/(17.625-Math.log(humidity/100)-((17.625*tempC)/(243.04+tempC))))
+		if (Math.abs(dp - dpMagnus) > 1) {
+			log.debug "dp=${Math.round(dp)}; dpMagnus=${Math.round(dpMagnus)}"
+		}
 		unit = "F"
 	} else {
 		dp = temp - (100 - humidity) / 5
+		// Magnus equation from http://bmcnoldy.rsmas.miami.edu/Humidity.html
+		//dp = 243.04*(Math.log(humidity/100)+((17.625*temp)/(243.04+temp)))/(17.625-Math.log(humidity/100)-((17.625*temp)/(243.04+temp)))
 		unit = "C"
 	}
 	
