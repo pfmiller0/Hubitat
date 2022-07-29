@@ -23,6 +23,9 @@ preferences {
 	}
 	if (state.activeIncidents != null) {
 		section("Active Incidents:") {
+			if (state.failCount > 0 ) {
+				paragraph "<p align='center' style='font-size:110%;'><b>Connection down!</b></p>"
+			}
 			if (state.activeIncidents != []) {
 				paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%; font-size:90%;">' + incidentsToStr(state.activeIncidents, "table") + "</table>"
 			} else {
