@@ -35,7 +35,7 @@ preferences {
 		}
 	}
 	section("Settings") {
-		input "updateTime", "number", title: "Update frequency (mins)", defaultValue: 5
+		input "update_interval", "number", title: "Update frequency (mins)", defaultValue: 5
 		input "notifyUnits", "string", title: "Notification unit"
 		input "notifyDevice", "capability.notification", title: "Notification device", multiple: false, required: false
 	}
@@ -75,7 +75,7 @@ void initialize() {
 			state.failCount = state.failCount ? state.failCount : 0
 		}
 
-		schedule('0 */' + updateTime + ' * ? * *', 'incidentCheck')
+		schedule('0 */' + update_interval + ' * ? * *', 'incidentCheck')
 	}
 }
 
@@ -95,7 +95,10 @@ void incidentCheck() {
 		ignoreSSLIssues: true
 	]
  
-	if (debugMode) log.debug "params: $params"
+	if (debugMode) {
+		log.debug "url: $url"
+		log.debug "params: $params"
+	}
 
 	try {
 		asynchttpGet('httpResponse', params, [data: null])
@@ -113,21 +116,28 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	String newMaxIncNum = ""
 
 	if (resp.getStatus() != 200 ) {	
-        if (state.failCount <= 3 ) {
+        state.failCount++
+		unschedule('incidentCheck')
+		if (state.failCount <= 4 ) {
             log.debug "HTTP error: " + resp.getStatus()
-			runIn(state.failCount * updateTime * 60, 'incidentCheck')
-            state.failCount++
-		} else if (state.failCount == 4 ) {
-            log.debug "HTTP error: " + resp.getStatus() + " (muting further errors)"
-            schedule('0 */' + state.failCount * updateTime + ' * ? * *', 'incidentCheck')
-			state.failCount++
+			runIn(update_interval * state.failCount * 60, 'incidentCheck')
+		} else if (state.failCount == 5 ) {
+            log.debug "HTTP error: " + resp.getStatus() + " (muting errors)"
+			runIn(update_interval * state.failCount * 60, 'incidentCheck')
+            notifyDevice.deviceNotification "SDFD notifier is down"
+		} else {
+			runIn(update_interval * 6 * 60, 'incidentCheck')
 		}
 		return
 	} else {
-        if (state.failCount > 0 ) {
-            log.info "HTTP error resolved"
-            schedule('0 */' + updateTime + ' * ? * *', 'incidentCheck')
+		if (state.failCount > 0 ) {
+			if (state.failCount >= 5 ) {
+				log.info "HTTP error resolved ($state.failCount)"
+				notifyDevice.deviceNotification "SDFD notifier is back up"
+			}
 			state.failCount = 0
+			unschedule('incidentCheck')
+            schedule('0 */' + update_interval + ' * ? * *', 'incidentCheck')
 		}
 	}
 
