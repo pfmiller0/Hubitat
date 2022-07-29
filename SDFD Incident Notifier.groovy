@@ -236,7 +236,8 @@ void logIncidents(List<Map> incidents, boolean isUpdated) {
 		if (isUpdated) {
 			incTime = "UPDATED"
 		} else {
-			incTime = "REC: " + df.format(toDateTime(inc.ResponseDate))
+			// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that part out
+			incTime = "REC: " + df.format(toDateTime(inc.ResponseDate.replaceAll('"\\.[0-9]*-', '-')))
 		}
 		
 		incDesc = "${inc.Address}${CrossStreet}:\n"
