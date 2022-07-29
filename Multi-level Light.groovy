@@ -5,15 +5,15 @@
  */
  
 definition(
-	name: "Multi-level Light",
-	namespace: "hyposphere.net",
-	parent: "hyposphere.net:P's Light Controls",
+    name: "Multi-level Light",
+    namespace: "hyposphere.net",
+    parent: "hyposphere.net:P's Light Controls",
 	author: "Peter Miller",
 	description: "Allow buttons to toggle between multiple light color/level settings",
-	category: "My Apps",
-	iconUrl: "",
-	iconX2Url: "",
-	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Multi-level%20Light.groovy"
+    category: "My Apps",
+    iconUrl: "",
+    iconX2Url: "",
+    importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Multi-level%20Light.groovy"
 )
 
 preferences {
@@ -53,10 +53,10 @@ def updated() {
 def initialize() {
 	if (isPaused == false) {
 		if (handleToggle == true) {
-			subscribe(button, "pushed", toggleLights)
+			subscribe(button, "pushed", 'toggleLights')
 		}
-		subscribe(button, "doubleTapped", lowerLights)
-		subscribe(button, "held", raiseLights)
+		subscribe(button, "doubleTapped", 'lowerLights')
+		subscribe(button, "held", 'raiseLights')
 	}
 }
 
@@ -73,11 +73,11 @@ void raiseLights(evt) {
 		light.latestValue("level") <= lightRaisePrimaryLevel - 3 ||
 		light.latestValue("level") >= lightRaisePrimaryLevel + 3) {
 		
-		//light.setLevel(lightRaisePrimaryLevel); light.setColorTemperature(lightRaisePrimaryTemp)
 		light.setColorTemperature(lightRaisePrimaryTemp, lightRaisePrimaryLevel)
+		light.on()
 	} else {
-		//light.setLevel(lightRaiseSecLevel); light.setColorTemperature(lightRaiseSecTemp)
 		light.setColorTemperature(lightRaiseSecTemp, lightRaiseSecLevel)
+		light.on()
 	}
 }
 
@@ -86,10 +86,10 @@ void lowerLights(evt) {
 		light.latestValue("level") <= lightLowerPrimaryLevel - 3 ||
 		light.latestValue("level") >= lightLowerPrimaryLevel + 3) {
 		
-		//light.setLevel(lightLowerPrimaryLevel); light.setColorTemperature(lightLowerPrimaryTemp)
 		light.setColorTemperature(lightLowerPrimaryTemp, lightLowerPrimaryLevel)
+		light.on()
 	} else {
-		//light.setLevel(lightLowerSecLevel); light.setColorTemperature(lightLowerSecTemp)
 		light.setColorTemperature(lightLowerSecTemp, lightLowerSecLevel)
+		light.on()
 	}
 }
