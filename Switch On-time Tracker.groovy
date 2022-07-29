@@ -18,7 +18,6 @@ definition(
 	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Switch%20On-time%20Tracker.groovy"
 )
 
-
 preferences {
 	page(name: "mainPage")
 	page(name: "resetPage")
@@ -70,10 +69,11 @@ void initialize() {
 		resetAppLabel()
 		
 		state.totalOnTime = state.totalOnTime ? state.totalOnTime : 0.0
+		//state.totalOnTime = 72045
 		state.notifyTime = 129600 // 3 months in minutes
 		state.turnOnTime = state.turnOnTime ? state.turnOnTime : now()
 		
-		subscribe(switchDev, "switch", switchChanged)		
+		subscribe(switchDev, "switch", 'switchChanged')		
 	} else {
 		addAppLabel("Paused", "red")
 	}
@@ -83,13 +83,16 @@ void switchChanged(evt) {
 	//log.debug evt.device.getId()
 	
 	if (switchDev.latestValue("switch") == "on") {
-		state.turnOnTime = now() 
+		state.turnOnTime = now()
+		//runIn(Math.round((state.notifyTime - state.totalOnTime)*60), 'sendNotification', [:])
 	} else {
-		state.totalOnTime += (now() - state.turnOnTime)/(1000*60) 
+		state.totalOnTime += (now() - state.turnOnTime)/(1000*60)
+		sendEvent(name: "On time", value: state.totalOnTime, unit: "minutes")
+		//unschedule()
 	}
 	
 	if (state.totalOnTime > state.notifyTime) {
-		notifyDev.deviceNotification "Time to clean the air filter!"
+		sendNotification()
 	}	
 }
 
@@ -99,6 +102,10 @@ Integer getOnTime() {
 	} else {
 		return Math.round(state.totalOnTime)
 	}
+}
+
+void sendNotification() {
+	notifyDev.deviceNotification "Time to clean the air filter!"
 }
 
 String printTime(Long mins) {
@@ -132,6 +139,7 @@ void appButtonHandler(String btn) {
 			state.turnOnTime = now()
 		}
 		state.showReset = false
+		sendEvent(name: "On time", value: state.totalOnTime, unit: "minutes")
 		break
 	default:
 		log.warn "Unhandled button press: $btn"
