@@ -300,7 +300,7 @@ void fanChange(evt) {
 	lastChangeHrs = "${Math.floor(minutesSinceLastChange() / 60) as Integer}"
 	lastChangeMin = "${minutesSinceLastChange() % 60 as Integer}"
 	
-	logInfo "Fan state changed ($lastChangeHrs:${lastChangeMin.padLeft(2, '0')} since last change)"
+	logInfo "Fan turned ${evt.value} ($lastChangeHrs:${lastChangeMin.padLeft(2, '0')} since last change)"
 	state.timeLastChange = now()
 }
 
