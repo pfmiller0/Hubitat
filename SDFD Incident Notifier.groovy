@@ -71,8 +71,8 @@ void initialize() {
 			state.prevIncNum = "FS00000000"
 			state.activeIncidents = []
 		} else {
-			state.prevIncNum = state.prevIncNum ? state.prevIncNum : "FS00000000"
-			state.failCount = state.failCount ? state.failCount : 0
+			state.prevIncNum = state.prevIncNum ?: "FS00000000"
+			state.failCount = state.failCount ?: 0
 		}
 
 		schedule('0 */' + update_interval + ' * ? * *', 'incidentCheck')
@@ -103,7 +103,7 @@ void incidentCheck() {
 	try {
 		asynchttpGet('httpResponse', params, [data: null])
 	} catch (e) {
-		if (debugMode) log.debug "There was an error: $e"	
+		log.error "There was an error: $e"	
 	}
 }
 
@@ -115,14 +115,15 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	List<Map> updatedActiveIncidents = []
 	String newMaxIncNum = ""
 
+	/***** Backoff on error *****/
 	if (resp.getStatus() != 200 ) {	
         state.failCount++
 		unschedule('incidentCheck')
 		if (state.failCount <= 4 ) {
-            log.debug "HTTP error: " + resp.getStatus()
+            log.error "HTTP error: " + resp.getStatus()
 			runIn(update_interval * state.failCount * 60, 'incidentCheck')
 		} else if (state.failCount == 5 ) {
-            log.debug "HTTP error: " + resp.getStatus() + " (muting errors)"
+            log.error "HTTP error: " + resp.getStatus() + " (muting errors)"
 			runIn(update_interval * state.failCount * 60, 'incidentCheck')
             notifyDevice.deviceNotification "SDFD notifier is down"
 		} else {
@@ -143,9 +144,10 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 
 	allIncidents = filterIncidentType(cleanupList(resp.getJson()), IGNORE_INC())
 	allIncidents = filterMedIncidents(allIncidents, AMBULANCE_UNITS())
-	fsIncidents = allIncidents.findAll { it.IncidentNumber.substring(0, 2) == "FS" }
-	otherIncidents = allIncidents.findAll { it.IncidentNumber.substring(0, 2) != "FS" }
-	activeIncidents = state.activeIncidents ? state.activeIncidents : []
+	// Check incidents length, to handle rare incidents with no incidentnumber
+	fsIncidents = allIncidents.findAll { it.IncidentNumber.length() > 4 && it.IncidentNumber.substring(0, 2) == "FS" }
+	otherIncidents = allIncidents.findAll { it.IncidentNumber.length() > 4 && it.IncidentNumber.substring(0, 2) != "FS" }
+	activeIncidents = state.activeIncidents ?: []
 	updatedActiveIncidents = []
 	
 	// Get and log updated incidents
