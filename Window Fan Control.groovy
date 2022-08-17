@@ -91,12 +91,12 @@ void initialize() {
 	if (isPaused == false) {
 		resetAppLabel()
 
-		state.timeLastChange = state.timeLastChange ? state.timeLastChange : 0
-		state.tempModeActive = state.tempModeActive ? state.tempModeActive : "Cooling"
+		state.timeLastChange = state.timeLastChange ?: 0
+		state.tempModeActive = state.tempModeActive ?: "Cooling"
 		
 		subscribe(thermoOut, "temperature", 'temperatureHandler')
 		subscribe(thermoIn, "temperature", 'temperatureHandler')
-
+		
 		subscribe(windowControl, "contact.closed", 'temperatureHandler')
 		subscribe(switchControl, "switch.on", 'temperatureHandler')
 		
@@ -149,7 +149,7 @@ void thermostateOffHandler(evt) {
 void temperatureHandler(evt) {
 	Float tempOut
 	Float tempIn
-	boolean thermostateEnabled = true	
+	boolean thermostateEnabled = true
 
 	// Check for thermostat control override switches
 	if (switchControl?.latestValue("switch") == "off") {
@@ -170,8 +170,8 @@ void temperatureHandler(evt) {
 			tempIn = tempRound(tempAverage(thermoIn))
 			logDebug "tempIn: $tempIn; tempOut: $tempOut"
 		} else {
-			tempOut = tempOut ? tempOut : tempRound(tempOutDebug)
-			tempIn = tempIn ? tempIn : tempRound(tempInDebug)
+			tempOut = tempOut ?: tempRound(tempOutDebug)
+			tempIn = tempIn ?: tempRound(tempInDebug)
 			logDebug "DEBUG tempIn: $tempIn; tempOut: $tempOut"
 		}
         
@@ -222,7 +222,7 @@ void temperatureHandler(evt) {
 					logDebug "Do nothing: $tempIn is at target (in: $tempIn; out: $tempOut; target: $tempTargetCooling)"
 				}
 			} else {
-				changeFanState("off", " Cooling: Too warm out, turning fan off (in: $tempIn; out: $tempOut; target: $tempTargetCooling)")
+				changeFanState("off", "Cooling: Too warm out, turning fan off (in: $tempIn; out: $tempOut; target: $tempTargetCooling)")
 			}
 		} else { // Heating mode
             // Add temp adjust for heating mode
@@ -297,10 +297,10 @@ void fanChange(evt) {
 	// Can we use the built in time since last fan state change?
 	//     fan.currentState("motion").date.time
 	
-	lastChangeHrs = "${Math.floor(minutesSinceLastChange() / 60) as Integer}"
-	lastChangeMin = "${minutesSinceLastChange() % 60 as Integer}"
+	lastChangeHrs = sprintf('%d', (Integer) Math.floor(minutesSinceLastChange() / 60))
+	lastChangeMin = sprintf('%02d', minutesSinceLastChange() % 60)
 	
-	logInfo "Fan turned ${evt.value} ($lastChangeHrs:${lastChangeMin.padLeft(2, '0')} since last change)"
+	logInfo "Fan turned ${evt.value} ($lastChangeHrs:$lastChangeMin since last change)"
 	state.timeLastChange = now()
 }
 
@@ -308,7 +308,8 @@ Integer minutesSinceLastChange() {
 	return Math.round((now() - state.timeLastChange) / (1000 * 60))
 }
 
-Integer tempRound(Float t) {
+Float tempRound(Float t) {
+	// Round to nearest half degree
 	return Math.round(t*2)/2
 }
 
