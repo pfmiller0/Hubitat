@@ -112,6 +112,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	List<Map> fsIncidents = []
 	List<Map> otherIncidents = []
 	List<Map> activeIncidents = []
+	List<Map> resolvedIncidents = []
 	List<Map> updatedActiveIncidents = []
 	String newMaxIncNum = ""
 
@@ -151,6 +152,14 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	updatedActiveIncidents = []
 	
 	// Get and log updated incidents
+	resolvedIncidents = getResolvedIncidents(allIncidents, activeIncidents)
+	if (resolvedIncidents) {
+		// log.debug "Resolved: ${resolvedIncidents}"
+		// log.debug "Diff: ${activeIncidents.minus(resolvedIncidents) {it.IncidentNumber}}"
+		logIncidents(resolvedIncidents, "RESOLVED")
+	}
+	//activeIncidents.minus(resolvedIncidents) {it.IncidentNumber}
+	
 	activeIncidents = removeResolvedIncidents(allIncidents, activeIncidents)
 	updatedActiveIncidents = getUpdatedActiveIncidents(allIncidents, activeIncidents)
 	// Update active incidents with new data
@@ -158,14 +167,14 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		activeIncidents[activeIncidents.findIndexOf { it.IncidentNumber == cur.IncidentNumber }].putAll(cur)
 	}
 	
-	if (updatedActiveIncidents != []) logIncidents(updatedActiveIncidents, true)
+	if (updatedActiveIncidents != []) logIncidents(updatedActiveIncidents, "UPDATED")
 	
 	fsIncidents = newIncidents(fsIncidents)
 	if (fsIncidents != []) {
 		newMaxIncNum = fsIncidents*.IncidentNumber.max()
 		activeIncidents.addAll(fsIncidents)
 		
-		logIncidents(fsIncidents + otherIncidents, false)
+		logIncidents(fsIncidents + otherIncidents, "NEW")
 		fsIncidents = localIncidents(notifyUnits, fsIncidents)
 		
 		if (fsIncidents != []) notifyDevice.deviceNotification incidentsToStr(fsIncidents, "min")
@@ -214,7 +223,6 @@ List<Map> cleanupList(List<Map> incidents) {
 	return cleanInc
 }
 
-
 List<Map> getUpdatedActiveIncidents(List<Map> allIncidents, List<Map> activeIncidents) {
 	List<Map> updatedInc = []
 	Map prev = null
@@ -230,16 +238,21 @@ List<Map> getUpdatedActiveIncidents(List<Map> allIncidents, List<Map> activeInci
 	return updatedInc
 }
 
-
 List<Map> removeResolvedIncidents(List<Map> allIncidents, List<Map> activeIncidents) {
 	return activeIncidents.findAll { inc ->
 		allIncidents.any { it.IncidentNumber == inc.IncidentNumber }
 	}
 }
 
-void logIncidents(List<Map> incidents, boolean isUpdated) {
+List<Map> getResolvedIncidents(List<Map> allIncidents, List<Map> activeIncidents) {
+	return activeIncidents.findAll { inc ->
+		allIncidents.every { it.IncidentNumber != inc.IncidentNumber }
+	}
+}
+
+void logIncidents(List<Map> incidents, String LogType) {
 	List<String> listIgnoreTypes = REDUNDANT_TYPES()
-	java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm");
+
 	String IncidentType = ""
 	String CrossStreet = ""
 	String incDesc = ""
@@ -248,18 +261,48 @@ void logIncidents(List<Map> incidents, boolean isUpdated) {
 	incidents.each { inc ->
 		IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : " [$inc.IncidentTypeName]"
 		CrossStreet = inc.CrossStreet ? " | $inc.CrossStreet" : ""
-		if (isUpdated) {
-			incTime = "UPDATED"
-		} else {
+		if (LogType == "NEW") {
+			java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm")
+	
 			// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that part out
 			incTime = "REC: " + df.format(toDateTime(inc.ResponseDate.replaceAll('"\\.[0-9]*-', '-')))
+		
+			incDesc = "${inc.Address}${CrossStreet}:\n"
+			inc.Units.each {
+				incDesc = incDesc + " $it"
+			}
+		} else if (LogType == "UPDATED") {
+			incTime = "UPDATED"
+
+			incDesc = "${inc.Address}${CrossStreet}:\n"
+			inc.Units.each {
+				incDesc = incDesc + " $it"
+			}
+		} else if (LogType == "RESOLVED") {
+			Integer incResolutionMinutes
+	
+			String resHrs
+			String resMin
+
+			IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : " [$inc.IncidentTypeName]"
+			CrossStreet = inc.CrossStreet ? " | $inc.CrossStreet" : ""
+		
+			incResolutionMinutes = ((now() - toDateTime(inc.ResponseDate.replaceAll('"\\.[0-9]*-', '-')).getTime()) / (1000 * 60))
+			// round down to nearest update_interval
+			incResolutionMinutes = Math.floor(incResolutionMinutes / update_interval) * update_interval
+			
+			// Don't log short incidents
+			if (incResolutionMinutes <= 15 || incResolutionMinutes == update_interval) return
+			
+			// resHrs = sprintf('%d', (Integer) Math.floor(incResolutionMinutes.intValue() / 60))
+			resHrs = "${(Integer) Math.floor(incResolutionMinutes / 60)}"
+			resMin = sprintf('%02d', incResolutionMinutes % 60)
+	
+			incTime = "RESOLVED"
+		
+			incDesc = "${inc.Address}${CrossStreet}:\nIncident time ${resHrs}:${resMin}"
 		}
 		
-		incDesc = "${inc.Address}${CrossStreet}:\n"
-		inc.Units.each {
-			incDesc = incDesc + " $it"
-		}
-
 		sendEvent(name: "${inc.CallType}${IncidentType}", value: "$inc.IncidentNumber ($incTime)", descriptionText: incDesc) 
 	}
 }
