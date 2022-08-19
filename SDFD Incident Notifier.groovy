@@ -279,28 +279,20 @@ void logIncidents(List<Map> incidents, String LogType) {
 				incDesc = incDesc + " $it"
 			}
 		} else if (LogType == "RESOLVED") {
-			Integer incResolutionMinutes
-	
-			String resHrs
-			String resMin
+			Integer incMins
+			String resTime
 
 			IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : " [$inc.IncidentTypeName]"
 			CrossStreet = inc.CrossStreet ? " | $inc.CrossStreet" : ""
 		
-			incResolutionMinutes = ((now() - toDateTime(inc.ResponseDate.replaceAll('"\\.[0-9]*-', '-')).getTime()) / (1000 * 60))
-			// round down to nearest update_interval
-			incResolutionMinutes = Math.floor(incResolutionMinutes / update_interval) * update_interval
-			
+			incMins = getIncidentMinutes(inc.ResponseDate)
 			// Don't log short incidents
-			if (incResolutionMinutes <= 15 || incResolutionMinutes == update_interval) return
+			if (incMins <= 20 || incMins <= update_interval*2) return
+			resTime = sprintf('%d:%02d',(Integer) Math.floor(incMins / 60), incMins % 60)
 			
-			// resHrs = sprintf('%d', (Integer) Math.floor(incResolutionMinutes.intValue() / 60))
-			resHrs = "${(Integer) Math.floor(incResolutionMinutes / 60)}"
-			resMin = sprintf('%02d', incResolutionMinutes % 60)
-	
 			incTime = "RESOLVED"
 		
-			incDesc = "${inc.Address}${CrossStreet}:\nIncident time ${resHrs}:${resMin}"
+			incDesc = "${inc.Address}${CrossStreet}:\nIncident time ${resTime}"
 		}
 		
 		sendEvent(name: "${inc.CallType}${IncidentType}", value: "$inc.IncidentNumber ($incTime)", descriptionText: incDesc) 
@@ -318,10 +310,17 @@ String incidentToStr(Map<String, List> inc, String format) {
 		java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
 		out = df.format(toDateTime(inc.ResponseDate)) + incNum + " $inc.CallType $IncidentType $inc.Address$CrossStreet:"
 	} else if (format == "table") {
+		Integer incMins
+		String incTime
+		
+		incMins = getIncidentMinutes(inc.ResponseDate)
+		incTime = sprintf('%d:%02d',(Integer) Math.floor(incMins / 60) ,incMins % 60)
+		
 		String td = '<td style="border:1px solid silver;">'
 		String tdc = '</td>'
-		java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
-		out = td + df.format(toDateTime(inc.ResponseDate)) + tdc + td + " $inc.CallType $IncidentType" + tdc + td + "$inc.Address$CrossStreet" + tdc + td
+		//java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
+		//out = td + df.format(toDateTime(inc.ResponseDate)) + " (" + incTime + ")"+ tdc + td + " $inc.CallType $IncidentType" + tdc + td + "$inc.Address$CrossStreet" + tdc + td
+		out = td + incTime + tdc + td + " $inc.CallType $IncidentType" + tdc + td + "$inc.Address$CrossStreet" + tdc + td
 	} else if (format == "min") {
 		out = "$inc.CallType - $inc.Address$CrossStreet:"
 	} else if (format == "updated") {
@@ -347,4 +346,13 @@ String incidentsToStr(List<Map> incidents, String format) {
 	}
 	
 	return out
+}
+
+Integer getIncidentMinutes(String responseDate) {
+	Integer incMinutes
+	
+	// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that part out
+	incMinutes = ((now() - toDateTime(responseDate.replaceAll('"\\.[0-9]*-', '-')).getTime()) / (1000 * 60))
+	// round incident time down to nearest update_interval
+	return incMinutes - (incMinutes % update_interval)
 }
