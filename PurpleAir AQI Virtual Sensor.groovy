@@ -66,7 +66,7 @@ def poll() {
 def configure() {
 	unschedule()
 
-	//state.failCount = state.failCount ? state.failCount : 0
+	//state.failCount = state.failCount ?: 0
 	
 	//log.debug "update_interval: ${update_interval}"
 	
@@ -149,20 +149,20 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	String[][] sensorData
 	String sites
 	
-	/***/
+	/*****************************/
 	if (resp.getStatus() != 200 ) {
 		log.error "HTTP error from PurpleAir: " + resp.getStatus()
 		return
 	}
-	/***
+	/*** Test backoff on error ***
 	if (resp.getStatus() != 200 ) {	
         state.failCount++
 		unschedule('refresh')
 		if (state.failCount <= 4 ) {
-            log.debug "HTTP error from PurpleAir: " + resp.getStatus()
+            log.error "HTTP error from PurpleAir: " + resp.getStatus()
 			runIn(Integer.valueOf(update_interval) * state.failCount * 60, 'refresh')
 		} else if (state.failCount == 5 ) {
-            log.debug "HTTP error from PurpleAir: " + resp.getStatus() + " (muting errors)"
+            log.error "HTTP error from PurpleAir: " + resp.getStatus() + " (muting errors)"
 			runIn(Integer.valueOf(update_interval * state.failCount) * 60, 'refresh')
 		} else {
 			runIn(Integer.valueOf(update_interval) * 6 * 60, 'refresh')
@@ -177,7 +177,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 			configure()
 		}
 	}
-	/***/
+	/*****************************/
 	
 	if ( debugMode ) log.debug "size: ${resp.getJson().data.size()}"
 	
@@ -197,7 +197,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		log.debug "sites: ${sensorData.collect { it[RESPONSE_FIELDS["name"]] }}"
 		log.debug "AQIs: ${sensorData.collect { getPart2_5_AQI( Float.parseFloat(it[RESPONSE_FIELDS[avg_period]])) }}"
 		log.debug "confidence: ${sensorData.collect { it[RESPONSE_FIELDS["confidence"]] }}"
-		log.debug "unweighted av aqi: ${getPart2_5_AQI(RESPONSE_FIELDS[sensorData])}"
+		log.debug "unweighted av aqi: ${getPart2_5_AQI(sensorAverage(sensorData))}"
 		log.debug "coords: ${data.coords}"
 		if ( weighted_avg && device_search ) {
 			log.debug "weighted av aqi: ${getPart2_5_AQI(sensorAverageWeighted(sensorData, data.coords))}"
@@ -261,15 +261,6 @@ Float sensorAverageWeighted(String[][] sensors, Float[] coords) {
 	return sum / count
 }
 
-Float distance(Float[] a, def b) {
-    Float[] dist2deg = distance2degrees(a[0])
-
-    Float lat_diff = (a[0] - b[0])*dist2deg[0]
-    Float lon_diff = (a[1] - b[1])*dist2deg[1]
-
-    return Math.sqrt(lat_diff**2 + lon_diff**2)
-}
-
 // getAQI and AQILinear functions from https://www.airnow.gov/aqi/aqi-calculator/
 Integer getPart2_5_AQI(Float partCount) {
 	if ( partCount >= 0 && partCount < 12.1 ) {
@@ -319,6 +310,21 @@ String getCategory(Integer AQI) {
 	} else {
 		return "error"
 	}
+}
+
+Double distance(Float[] coorda, List<Float> coordb) {
+	// Haversine function from http://www.movable-type.co.uk/scripts/latlong.html
+	Double R = 6371000; // metres
+	Double φ1 = Math.toRadians(coorda[0]); // φ, λ in radians
+	Double φ2 = Math.toRadians(coordb[0]);
+	Double Δφ = Math.toRadians(coordb[0]-coorda[0]);
+	Double Δλ = Math.toRadians(coordb[1]-coorda[1]);
+
+	Double a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+	Double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+	Double d = (R * c) / 1000; // in km
+	return d / 1.609 // in miles
 }
 
 // Returns miles per degree for a given latitude
