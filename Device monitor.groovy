@@ -34,8 +34,9 @@ preferences {
 }
 
 void initialize() {
-	if (isPaused == false) {
+	if (! isPaused) {
 		resetAppLabel()
+		unschedule()
 		schedule('0 5 9,12,15,18,21 ? * *', 'deviceCheckStart')
 	} else {
 		addAppLabel("Paused", "red")
@@ -49,7 +50,7 @@ def installed() {
 
 def updated() {
 	initialize()
-	deviceCheck()
+	deviceCheckFinish()
 }
 
 def uninstalled() {
