@@ -177,7 +177,9 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 			state.prevIncNum = newMaxIncNum
 		}
 		
-		fsIncidents = localIncidents(notifyUnits, fsIncidents)
+		// Get incidents for notification
+		//fsIncidents = filterIncidentType(fsIncidents, NO_NOTIFICATION_TYPES())
+		fsIncidents = localIncidents(fsIncidents, notifyUnits)
 		
 		if (fsIncidents && notifyDevice) notifyDevice.deviceNotification incidentsToStr(fsIncidents, "min")	
 	}
@@ -201,7 +203,7 @@ boolean unitCalled(Map<String, List> incident, String unit) {
 	return incident.Units.any { it == unit }
 }
 
-List<Map> localIncidents(String localUnit, List<Map> incidents) {
+List<Map> localIncidents(List<Map> incidents, String localUnit) {
 	return incidents.findAll { unitCalled(it, localUnit) }
 }
 
@@ -215,7 +217,6 @@ List<Map> cleanupList(List<Map> incidents) {
 	incidents.each { inc ->
 		cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate, CallType: inc.CallType, IncidentTypeName: inc.IncidentTypeName, Address: inc.Address, CrossStreet: inc.CrossStreet, Units: inc.Units*.Code.sort()]
 	}
-
 	
 	return cleanInc
 }
