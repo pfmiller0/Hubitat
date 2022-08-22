@@ -192,12 +192,11 @@ List<Map> filterIncidentType(List<Map> incidents, List<String> types) {
 }
 
 List<Map> filterMedIncidents(List<Map> incidents, List<String> medUnits) {	
-	// TODO: Rewrite to use AMBULANCE_UNITS list
 	String unit_regexp = ""
-	AMBULANCE_UNITS().every { unit_regexp = unit_regexp + "|" + it }
 	
-	return incidents.findAll { inc -> !inc.Units.every {it =~ '(^M[0-9]+$)|(^AM[0-9]+$)|(^BLS[0-9]+$)' } }
-	//return incidents.findAll { inc -> !inc.Units.every {it =~ '^M[0-9]+$' || it =~ '^AM[0-9]+$' || it =~ '^BLS[0-9]+$' } }
+	AMBULANCE_UNITS().every { if (unit_regexp) unit_regexp += "|"; unit_regexp +=  '(^' + it + '[0-9]+$)'}
+	
+	return incidents.findAll { inc -> !inc.Units.every {it =~ unit_regexp } }
 }
 
 boolean unitCalled(Map<String, List> incident, String unit) {
