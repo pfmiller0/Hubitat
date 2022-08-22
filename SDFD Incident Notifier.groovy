@@ -283,6 +283,9 @@ void logIncidents(List<Map> incidents, String LogType) {
 			CrossStreet = inc.CrossStreet ? " | $inc.CrossStreet" : ""
 		
 			incMins = getIncidentMinutes(inc.ResponseDate)
+			// round incident time down to nearest update_interval
+			incMins = incMins - (incMins % update_interval)
+			
 			// Don't log short incidents
 			if (incMins <= 20 || incMins <= update_interval*2) return
 			resTime = sprintf('%d:%02d',(Integer) Math.floor(incMins / 60), incMins % 60)
@@ -346,10 +349,6 @@ String incidentsToStr(List<Map> incidents, String format) {
 }
 
 Integer getIncidentMinutes(String responseDate) {
-	Integer incMinutes
-	
 	// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that part out
-	incMinutes = ((now() - toDateTime(responseDate.replaceAll('"\\.[0-9]*-', '-')).getTime()) / (1000 * 60))
-	// round incident time down to nearest update_interval
-	return incMinutes - (incMinutes % update_interval)
+	return  ((now() - toDateTime(responseDate.replaceAll('"\\.[0-9]*-', '-')).getTime()) / (1000 * 60))
 }
