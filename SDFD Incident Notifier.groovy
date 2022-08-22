@@ -47,7 +47,7 @@ preferences {
 List<String> IGNORE_INC() { ["Medical", "Medical Alert Alarm", "Advised Incident", "RAP", "Logistics", "Facilities", "Duty Mechanic", "Carbon Monoxide Alarm", "Page", "Move Up", "STAND BACK HOLD", "CAD Test", "Drill", "Ringing Alarm", "Elevator Rescue", "Lock in/out", "DMS", "Special Service", "yGT General Transport"] }
 List<String> REDUNDANT_TYPES() { ["Advised Incident (misc.)", "Alert 1", "Alert 2 Brn/Mont", "Alert 2 Still Alarm", "Fuel in Bilge", "Pump Truck", "Traffic Accidents", "Single Resource", "Single Engine Response", "Hazmat", "TwoEngines", "Medical Multi-casualty", "Vegetation NO Special Response", "MTZ - Vegetaton Inital Attack", "Structure Commercial", "Rescue", "Gaslamp", "Traffic Accident Freeway (NC)", "Nat Gas Leak BB", "Nat Gas SING ENG SDGE", "Vehicle vs. Structure"] }
 //List<String> NO_NOTIFICATION_TYPES() { ["Vehicle fire freeway", "Ringing alarm highrise", "Traffic Accident FWY", "Extinguished fire"] }
-List<String> AMBULANCE_UNITS() { ["M", "AM", "BLS", "Sdge"] }
+List<String> AMBULANCE_UNITS() { ["M", "AM", "BLS"] }
 	
 void installed() {
 	if (debugMode) log.debug "Installed with settings: ${settings}"
