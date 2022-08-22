@@ -172,13 +172,14 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		activeIncidents.addAll(fsIncidents)
 		
 		logIncidents(fsIncidents + otherIncidents, "NEW")
-		fsIncidents = localIncidents(notifyUnits, fsIncidents)
-		
-		if (fsIncidents != []) notifyDevice.deviceNotification incidentsToStr(fsIncidents, "min")
 		
 		if (newMaxIncNum > state.prevIncNum) {
 			state.prevIncNum = newMaxIncNum
-		}	
+		}
+		
+		fsIncidents = localIncidents(notifyUnits, fsIncidents)
+		
+		if (fsIncidents && notifyDevice) notifyDevice.deviceNotification incidentsToStr(fsIncidents, "min")	
 	}
 	
 	state.activeIncidents = activeIncidents
