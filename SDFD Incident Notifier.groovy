@@ -66,7 +66,7 @@ void updated() {
 }
 
 void initialize() {
-	if (isPaused == false) {
+	if (! isPaused) {
 		if (debugMode) {
 			state.prevIncNum = "FS00000000"
 			state.activeIncidents = []
@@ -143,34 +143,31 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		}
 	}
 
-	allIncidents = filterIncidentType(cleanupList(resp.getJson()), IGNORE_INC())
-	allIncidents = filterMedIncidents(allIncidents, AMBULANCE_UNITS())
-	// Check incidents length, to handle rare incidents with no incidentnumber
+	// reorganize incident data -> remove ignored types -> remove medical incidents
+	allIncidents = filterMedIncidents(filterIncidentType(cleanupList(resp.getJson()), IGNORE_INC()), AMBULANCE_UNITS())
+	// Check incidents length, so we can filter rare incidents with no incidentnumber
 	fsIncidents = allIncidents.findAll { it.IncidentNumber.length() > 4 && it.IncidentNumber.substring(0, 2) == "FS" }
 	otherIncidents = allIncidents.findAll { it.IncidentNumber.length() > 4 && it.IncidentNumber.substring(0, 2) != "FS" }
 	activeIncidents = state.activeIncidents ?: []
-	updatedActiveIncidents = []
+	
+	// Get and log resolved incidents
+	resolvedIncidents = getResolvedIncidents(allIncidents, activeIncidents)
+	if (resolvedIncidents) logIncidents(resolvedIncidents, "RESOLVED")
 	
 	// Get and log updated incidents
-	resolvedIncidents = getResolvedIncidents(allIncidents, activeIncidents)
-	if (resolvedIncidents) {
-		// log.debug "Resolved: ${resolvedIncidents}"
-		// log.debug "Diff: ${activeIncidents.minus(resolvedIncidents) {it.IncidentNumber}}"
-		logIncidents(resolvedIncidents, "RESOLVED")
-	}
 	//activeIncidents.minus(resolvedIncidents) {it.IncidentNumber}
-	
 	activeIncidents = removeResolvedIncidents(allIncidents, activeIncidents)
 	updatedActiveIncidents = getUpdatedActiveIncidents(allIncidents, activeIncidents)
 	// Update active incidents with new data
 	updatedActiveIncidents.each { cur ->
 		activeIncidents[activeIncidents.findIndexOf { it.IncidentNumber == cur.IncidentNumber }].putAll(cur)
 	}
+	if (updatedActiveIncidents) logIncidents(updatedActiveIncidents, "UPDATED")
 	
-	if (updatedActiveIncidents != []) logIncidents(updatedActiveIncidents, "UPDATED")
-	
+	// Get and log new incidents
 	fsIncidents = newIncidents(fsIncidents)
-	if (fsIncidents != []) {
+	
+	if (fsIncidents) {
 		newMaxIncNum = fsIncidents*.IncidentNumber.max()
 		activeIncidents.addAll(fsIncidents)
 		
