@@ -145,9 +145,8 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 
 	// reorganize incident data -> remove ignored types -> remove medical incidents
 	allIncidents = filterMedIncidents(filterIncidentType(cleanupList(resp.getJson()), IGNORE_INC()), AMBULANCE_UNITS())
-	// Check incidents length, so we can filter rare incidents with no incidentnumber
-	fsIncidents = allIncidents.findAll { it.IncidentNumber.length() > 4 && it.IncidentNumber.substring(0, 2) == "FS" }
-	otherIncidents = allIncidents.findAll { it.IncidentNumber.length() > 4 && it.IncidentNumber.substring(0, 2) != "FS" }
+	fsIncidents = allIncidents.findAll { it.IncidentNumber.substring(0, 2) == "FS" }
+	otherIncidents = allIncidents.findAll { it.IncidentNumber.substring(0, 2) != "FS" }
 	activeIncidents = state.activeIncidents ?: []
 	
 	// Get and log resolved incidents
@@ -213,9 +212,14 @@ List<Map> newIncidents(List<Map> incidents) {
 
 List<Map> cleanupList(List<Map> incidents) {
 	List<Map> cleanInc = []
+	String[] units
 	
 	incidents.each { inc ->
-		cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate, CallType: inc.CallType, IncidentTypeName: inc.IncidentTypeName, Address: inc.Address, CrossStreet: inc.CrossStreet, Units: inc.Units*.Code.sort()]
+		units = inc.Units*.Code.sort()
+		// Drop incidents with no units and invalid inc numbers
+		if (units && inc.MasterIncidentNumber.length() > 4) {
+			cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate, CallType: inc.CallType, IncidentTypeName: inc.IncidentTypeName, Address: inc.Address, CrossStreet: inc.CrossStreet, DistMiles: null, Units: units]
+		}
 	}
 	
 	return cleanInc
