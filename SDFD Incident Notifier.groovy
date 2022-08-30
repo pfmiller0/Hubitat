@@ -358,3 +358,123 @@ Integer getIncidentMinutes(String responseDate) {
 	// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that part out
 	return  ((now() - toDateTime(responseDate.replaceAll('"\\.[0-9]*-', '-')).getTime()) / (1000 * 60))
 }
+
+
+List<Double> getIncidentCoords(String address, String crossStreets) {
+	String[] streets
+	List<List<Double>> coords = []
+	List<Double> c = [0.0, 0.0]
+	Integer cCount = 0
+	
+	//log.debug "  getIncidentCoords: address=${address}, crossStreets=${crossStreets}"
+	
+	if ( address =~ /[0-9]+-[0-9]+ .*/ ) {
+		String[] nums = address.substring(0, address.indexOf(" ")).split("-")
+		String street = address.substring(address.indexOf(" "))
+		//log.debug "  getIncidentCoords: address range: ${nums} ${street}"
+		coords[0] = gMapsLocationQuery(["${nums[0]} ${street}"])
+		coords[1] = gMapsLocationQuery(["${nums[1]} ${street}"])
+	} else if (crossStreets != null ) {
+		streets = crossStreets.split("/")
+		streets.each{street -> ; c = gMapsLocationQuery([address, street]); if (c) coords << c}
+	} else {
+		//log.debug "  getIncidentCoords: no cross street"
+		coords[0] = gMapsLocationQuery([address, street])
+	}
+	
+	//log.debug "  getIncidentCoords: coords returned: ${coords}"
+	
+	// Reset c and get average of returned coords
+	c = [0.0, 0.0]
+	coords.each {if (it) {cCount++; c[0] += it[0]; c[1] += it[1]}}
+	
+	if (cCount > 0) {
+		c = [c[0] / (Double) cCount, c[1] / (Double) cCount]
+	} else {
+		c = []
+		log.debug sprintf("%s|%s: [%.4f, %.4f], dist: %.1f", address, crossStreets, c[0], c[1], getDistance(c, [location.latitude, location.longitude]))
+	}
+	
+	return c
+}
+
+/*
+ * Google API to convert streets to coordinates
+ * 
+ * https://developers.google.com/maps/documentation/geocoding/overview
+ * https://developers.google.com/maps/documentation/geocoding/requests-geocoding
+ * --> Requires api key. 40,000 free queries per month
+ */
+List<Double> gMapsLocationQuery(List<String> intersection) {
+	String url="https://maps.googleapis.com/maps/api/geocode/json"
+	String sdLocationComponents = "locality:San Diego|administrative_area_level_1:CA|country:US"
+	String queryAddr = ""
+	Map httpQuery
+	Double[] coords = [0.0, 0.0]
+	
+	if (intersection.size() == 1) {
+		queryAddr = intersection[0] + ", San Diego, CA, US"
+	} else if (intersection.size() == 2) {
+		queryAddr = intersection[0] + " & " + intersection[1] + ", San Diego, CA, US"
+	} else {
+		return null
+	}
+	
+	httpQuery = [key: gMapsAPIkey, address: queryAddr, components: sdLocationComponents]
+	
+	Map params = [
+		uri: url,
+		query: httpQuery,
+		requestContentType: "application/json",
+		contentType: "application/json",
+		timeout: 1,
+		ignoreSSLIssues: true
+	]
+
+	if ( debugMode ) log.debug "params: $params"
+	//log.debug "    gMapsLocationQuery:  queryAddr: ${queryAddr}"
+				
+	try {
+		httpGet(params) { resp ->
+			//log.debug "Request was successful, $resp.status"
+			Map result
+			result=resp.getData().results.find { it.types == ["street_number"] || it.types == ["intersection"] || it.types == ["street_address"] || it.location_type == "RANGE_INTERPOLATED"}
+			//result=resp.getData().results[0]
+			if (result) {
+			//if (result.types[0] == "street_number" || result.types[0] == "intersection") {
+				coords[0]=result.geometry.location.lat
+				coords[1]=result.geometry.location.lng
+				//log.debug "    address: ${result.formatted_address}"
+				//log.debug "    gMapsLocationQuery:  location: ${coords[0]},${coords[1]}"
+				return coords
+			} else {
+				//log.debug "    gMapsLocationQuery:  No match"
+				//log.debug groovy.json.JsonOutput.toJson(resp.getData().results)
+				return null
+			}
+		}
+	} catch (SocketTimeoutException e) {
+		log.error("GMaps connection timed out (timeout=${params.timeout}")
+		return null
+	} catch (e) {
+		log.error("GMaps connection error: $e")
+		return null
+	}
+}
+	 
+Double getDistance(List<Double> coorda, List<Double> coordb) {
+	if (! coorda || ! coordb ) return null
+		
+	// Haversine function from http://www.movable-type.co.uk/scripts/latlong.html
+	Double R = 6371000; // metres
+	Double φ1 = Math.toRadians(coorda[0]); // φ, λ in radians
+	Double φ2 = Math.toRadians(coordb[0]);
+	Double Δφ = Math.toRadians(coordb[0]-coorda[0]);
+	Double Δλ = Math.toRadians(coordb[1]-coorda[1]);
+
+	Double a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+	Double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+	Double d = (R * c) / 1000; // in km
+	return d / 1.609 // in miles
+}
