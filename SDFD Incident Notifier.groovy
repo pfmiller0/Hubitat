@@ -38,6 +38,7 @@ preferences {
 		input "notifyDevice", "capability.notification", title: "Notification device", multiple: false, required: false
 		input "update_interval", "number", title: "Update frequency (mins)", defaultValue: 5
 		input "notifyUnits", "string", title: "Notification unit"
+		input "gMapsAPIkey", "string", title: "Google Maps API key", required: false
 	}
 	section("Debug") {
 		input "debugMode", "bool", title: "Enable debug logging", defaultValue: false
@@ -165,6 +166,16 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	
 	// Get and log new incidents
 	fsIncidents = newIncidents(fsIncidents)
+	// Query location of new incidents
+	if (fsIncidents) {
+	List<Double> coords
+		fsIncidents.eachWithIndex{ inc, i ->
+			coords = getIncidentCoords(inc.Address, inc.CrossStreet)
+			fsIncidents[i].lat = coords[0]
+			fsIncidents[i].lng = coords[1]
+			fsIncidents[i].DistMiles = getDistance(coords, [location.latitude, location.longitude])
+		}
+	}
 	
 	if (fsIncidents) {
 		newMaxIncNum = fsIncidents*.IncidentNumber.max()
@@ -234,6 +245,9 @@ List<Map> getUpdatedActiveIncidents(List<Map> allIncidents, List<Map> activeInci
 		prev = activeIncidents.find { it.IncidentNumber == cur.IncidentNumber }
 		if (prev && (cur.CallType != prev.CallType || cur.Units != prev.Units || cur.Address != prev.Address || cur.CrossStreet != prev.CrossStreet)) {
 			//updatedInc << [IncidentNumber: cur.MasterIncidentNumber, ResponseDate: cur.ResponseDate, CallType: cur.CallType, IncidentTypeName: cur.IncidentTypeName, Address: cur.Address, CrossStreet: cur.CrossStreet, Units: cur.Units]
+			cur.lat = prev?.lat
+			cur.lng = prev?.lng
+			cur.DistMiles = prev?.DistMiles
 			updatedInc << cur
 		}
 	}
@@ -284,7 +298,7 @@ void logIncidents(List<Map> incidents, String LogType) {
 		} else if (LogType == "RESOLVED") {
 			Integer incMins
 			String resTime
-
+			
 			IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : " [$inc.IncidentTypeName]"
 			CrossStreet = inc.CrossStreet ? " | $inc.CrossStreet" : ""
 		
@@ -358,7 +372,6 @@ Integer getIncidentMinutes(String responseDate) {
 	// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that part out
 	return  ((now() - toDateTime(responseDate.replaceAll('"\\.[0-9]*-', '-')).getTime()) / (1000 * 60))
 }
-
 
 List<Double> getIncidentCoords(String address, String crossStreets) {
 	String[] streets
