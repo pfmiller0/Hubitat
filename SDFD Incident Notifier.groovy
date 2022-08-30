@@ -223,15 +223,14 @@ List<Map> newIncidents(List<Map> incidents) {
 
 List<Map> cleanupList(List<Map> incidents) {
 	List<Map> cleanInc = []
-	String[] units
 	
 	incidents.each { inc ->
-		units = inc.Units*.Code.sort()
 		// Drop incidents with no units and invalid inc numbers
-		if (units && inc.MasterIncidentNumber.length() > 4) {
-			cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate, CallType: inc.CallType, IncidentTypeName: inc.IncidentTypeName, Address: inc.Address, CrossStreet: inc.CrossStreet, DistMiles: null, Units: units]
+		if (inc.Units.size > 0 && inc.MasterIncidentNumber.length() > 4) {
+			cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate, CallType: inc.CallType, IncidentTypeName: inc.IncidentTypeName, Address: inc.Address, CrossStreet: inc.CrossStreet, lat: null, lng: null, DistMiles: null, Units: inc.Units*.Code.sort()]
 		}
 	}
+	//log.debug "size: ${incidents.size()}, clean: ${cleanInc.size()}"
 	
 	return cleanInc
 }
@@ -332,7 +331,7 @@ String incidentToStr(Map<String, List> inc, String format) {
 	} else if (format == "table") {
 		Integer incMins
 		String incTime
-		
+
 		incMins = getIncidentMinutes(inc.ResponseDate)
 		incTime = sprintf('%d:%02d',(Integer) Math.floor(incMins / 60) ,incMins % 60)
 		
@@ -416,7 +415,7 @@ List<Double> getIncidentCoords(String address, String crossStreets) {
  * 
  * https://developers.google.com/maps/documentation/geocoding/overview
  * https://developers.google.com/maps/documentation/geocoding/requests-geocoding
- * --> Requires api key. 40,000 free queries per month
+ *  --> Requires api key. 40,000 free queries per month
  */
 List<Double> gMapsLocationQuery(List<String> intersection) {
 	String url="https://maps.googleapis.com/maps/api/geocode/json"
