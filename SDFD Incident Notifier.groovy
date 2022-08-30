@@ -331,13 +331,23 @@ String incidentToStr(Map<String, List> inc, String format) {
 	} else if (format == "table") {
 		Integer incMins
 		String incTime
+		String url = ""
 		
+		if (inc?.lat && inc?.lng) {
+			/*** Query format
+			*	z: zoom (1-20)
+			*	t: type ("m" map, "k" satellite, "h" hybrid, "p" terrain, "e" GoogleEarth)
+			*	q: query (loc: lat lon separated by a +)
+			***/
+			url = "<a href='http://maps.google.com/maps?z=20&t=m&q=loc:${inc.lat}+${inc.lng}'>"
+		}
+
 		incMins = getIncidentMinutes(inc.ResponseDate)
 		incTime = sprintf('%d:%02d',(Integer) Math.floor(incMins / 60) ,incMins % 60)
 		
 		String td = '<td style="border:1px solid silver;">'
 		String tdc = '</td>'
-		out = td + incTime + tdc + td + " $inc.CallType $IncidentType" + tdc + td + "${inc.Address}${CrossStreet}${inc.DistMiles ? sprintf(" (%.1f mi)", inc.DistMiles) : "" }" + tdc + td
+		out = td + incTime + tdc + td + " $inc.CallType $IncidentType" + tdc + td + "${url}${inc.Address}${CrossStreet}${ url ? "</a>" : "" }${inc.DistMiles ? sprintf(" (%.1f mi)", inc.DistMiles) : "" }" + tdc + td
 	} else if (format == "min") {
 		out = "$inc.CallType - ${inc.Address}${CrossStreet}${inc.DistMiles ? sprintf(" (%.1fmi)", inc.DistMiles) : ""}:"
 	} else if (format == "updated") {
