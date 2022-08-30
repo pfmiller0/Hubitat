@@ -214,7 +214,7 @@ boolean unitCalled(Map<String, List> incident, String unit) {
 }
 
 List<Map> localIncidents(List<Map> incidents, String localUnit) {
-	return incidents.findAll { unitCalled(it, localUnit) }
+	return incidents.findAll { it.DistMiles ? it.DistMiles < 1.75 : unitCalled(it, localUnit) }
 }
 
 List<Map> newIncidents(List<Map> incidents) {	
@@ -279,17 +279,17 @@ void logIncidents(List<Map> incidents, String LogType) {
 		CrossStreet = inc.CrossStreet ? " | $inc.CrossStreet" : ""
 		if (LogType == "NEW") {
 			java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm")
-	
+			
 			// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that part out
 			incTime = "REC: " + df.format(toDateTime(inc.ResponseDate.replaceAll('"\\.[0-9]*-', '-')))
-		
+			
 			incDesc = "${inc.Address}${CrossStreet}:\n"
 			inc.Units.each {
 				incDesc = incDesc + " $it"
 			}
 		} else if (LogType == "UPDATED") {
 			incTime = "UPDATED"
-
+			
 			incDesc = "${inc.Address}${CrossStreet}:\n"
 			inc.Units.each {
 				incDesc = incDesc + " $it"
@@ -300,7 +300,7 @@ void logIncidents(List<Map> incidents, String LogType) {
 			
 			IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : " [$inc.IncidentTypeName]"
 			CrossStreet = inc.CrossStreet ? " | $inc.CrossStreet" : ""
-		
+			
 			incMins = getIncidentMinutes(inc.ResponseDate)
 			// round incident time down to nearest update_interval
 			incMins = incMins - (incMins % update_interval)
@@ -310,7 +310,7 @@ void logIncidents(List<Map> incidents, String LogType) {
 			resTime = sprintf('%d:%02d',(Integer) Math.floor(incMins / 60), incMins % 60)
 			
 			incTime = "RESOLVED"
-		
+			
 			incDesc = "${inc.Address}${CrossStreet}:\nIncident time ${resTime}"
 		}
 		
@@ -331,7 +331,7 @@ String incidentToStr(Map<String, List> inc, String format) {
 	} else if (format == "table") {
 		Integer incMins
 		String incTime
-
+			
 		incMins = getIncidentMinutes(inc.ResponseDate)
 		incTime = sprintf('%d:%02d',(Integer) Math.floor(incMins / 60) ,incMins % 60)
 		
