@@ -331,17 +331,15 @@ String incidentToStr(Map<String, List> inc, String format) {
 	} else if (format == "table") {
 		Integer incMins
 		String incTime
-			
+		
 		incMins = getIncidentMinutes(inc.ResponseDate)
 		incTime = sprintf('%d:%02d',(Integer) Math.floor(incMins / 60) ,incMins % 60)
 		
 		String td = '<td style="border:1px solid silver;">'
 		String tdc = '</td>'
-		//java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
-		//out = td + df.format(toDateTime(inc.ResponseDate)) + " (" + incTime + ")"+ tdc + td + " $inc.CallType $IncidentType" + tdc + td + "$inc.Address$CrossStreet" + tdc + td
-		out = td + incTime + tdc + td + " $inc.CallType $IncidentType" + tdc + td + "${inc.Address}${CrossStreet}" + tdc + td
+		out = td + incTime + tdc + td + " $inc.CallType $IncidentType" + tdc + td + "${inc.Address}${CrossStreet}${inc.DistMiles ? sprintf(" (%.1f mi)", inc.DistMiles) : "" }" + tdc + td
 	} else if (format == "min") {
-		out = "$inc.CallType - ${inc.Address}${CrossStreet}:"
+		out = "$inc.CallType - ${inc.Address}${CrossStreet}${inc.DistMiles ? sprintf(" (%.1fmi)", inc.DistMiles) : ""}:"
 	} else if (format == "updated") {
 		out = "UPDATED" + incNum + " $inc.CallType - ${inc.Address}${CrossStreet}:"
 	}
