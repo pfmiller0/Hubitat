@@ -34,10 +34,13 @@ preferences {
 			paragraph "<p align='right' style='font-size:90%;'><a href='http://hubitat/installedapp/events/${app.id}'>Incident history</a></p>"
 		}
 	}
-	section("Settings") {
+	section("Notification Settings") {
 		input "notifyDevice", "capability.notification", title: "Notification device", multiple: false, required: false
-		input "update_interval", "number", title: "Update frequency (mins)", defaultValue: 5
-		input "notifyUnits", "string", title: "Notification unit"
+		input "notifyDist", "decimal", title: "Notification distance", defaultValue: 1, required: true
+		input "notifyUnits", "string", title: "Notification unit (if distance is unknown)"
+	}
+	section("Settings") {
+		input "update_interval", "number", title: "Update frequency (mins)", defaultValue: 5, required: true
 		input "gMapsAPIkey", "string", title: "Google Maps API key", required: false
 	}
 	section("Debug") {
@@ -214,7 +217,7 @@ boolean unitCalled(Map<String, List> incident, String unit) {
 }
 
 List<Map> localIncidents(List<Map> incidents, String localUnit) {
-	return incidents.findAll { it.DistMiles ? it.DistMiles < 1.75 : unitCalled(it, localUnit) }
+	return incidents.findAll { it.DistMiles ? it.DistMiles < notifyDist : unitCalled(it, localUnit) }
 }
 
 List<Map> newIncidents(List<Map> incidents) {	
@@ -325,7 +328,7 @@ String incidentToStr(Map<String, List> inc, String format) {
 	String IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : "[$inc.IncidentTypeName]"
 	String incNum = debugMode ? " ($inc.IncidentNumber)" : ""
 	
-	if (format == "full") {
+	if (format == "full") { // full was used for logging to sytem logs. Remove?
 		java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
 		out = df.format(toDateTime(inc.ResponseDate)) + incNum + " $inc.CallType $IncidentType $inc.Address$CrossStreet:"
 	} else if (format == "table") {
@@ -335,7 +338,7 @@ String incidentToStr(Map<String, List> inc, String format) {
 		
 		if (inc?.lat && inc?.lng) {
 			/*** Query format
-			*	z: zoom (1-20)
+			*	z: zoom (1-20)(Doesn't work?)
 			*	t: type ("m" map, "k" satellite, "h" hybrid, "p" terrain, "e" GoogleEarth)
 			*	q: query (loc: lat lon separated by a +)
 			***/
@@ -385,6 +388,8 @@ List<Double> getIncidentCoords(String address, String crossStreets) {
 	List<List<Double>> coords = []
 	List<Double> c = [0.0, 0.0]
 	Integer cCount = 0
+	
+	if (! gMapsAPIkey) return []
 	
 	//log.debug "  getIncidentCoords: address=${address}, crossStreets=${crossStreets}"
 	
