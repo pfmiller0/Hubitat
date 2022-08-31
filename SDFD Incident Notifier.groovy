@@ -66,7 +66,6 @@ void updated() {
 	unsubscribe()
 	unschedule()
 	initialize()
-	incidentCheck()
 }
 
 void initialize() {
@@ -80,6 +79,8 @@ void initialize() {
 		}
 
 		schedule('0 */' + update_interval + ' * ? * *', 'incidentCheck')
+		
+		incidentCheck()
 	}
 }
 
@@ -286,7 +287,7 @@ void logIncidents(List<Map> incidents, String LogType) {
 			// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that part out
 			incTime = "REC: " + df.format(toDateTime(inc.ResponseDate.replaceAll('"\\.[0-9]*-', '-')))
 			
-			incDesc = "${inc.Address}${CrossStreet}:\n"
+			incDesc = "${inc.Address}${CrossStreet}${inc.DistMiles ? sprintf(" (%.1f mi)", inc.DistMiles) : ""}:\n"
 			inc.Units.each {
 				incDesc = incDesc + " $it"
 			}
@@ -486,7 +487,7 @@ List<Double> gMapsLocationQuery(List<String> intersection) {
 		return null
 	}
 }
-	 
+
 Double getDistance(List<Double> coorda, List<Double> coordb) {
 	if (! coorda || ! coordb ) return null
 		
