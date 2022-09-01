@@ -394,7 +394,7 @@ String getGMapsURL (Double lat, Double lng) {
 	*	q: query (loc: lat lon separated by a +)
 	***/
 	if (lat && lng ) {
-		return "http://maps.google.com/maps?z=20&t=m&q=loc:${inc.lat}+${inc.lng}"
+		return "http://maps.google.com/maps?z=20&t=m&q=loc:${lat}+${lng}"
 	} else {
 		return ""
 	}
