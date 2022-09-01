@@ -22,28 +22,28 @@ preferences {
 		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
 	if (state.activeIncidents != null) {
-		section("Active Incidents:") {
+		section("<b>Active Incidents</b>") {
 			if (state.failCount > 0 ) {
 				paragraph "<p align='center' style='font-size:110%;'><b>Connection down!</b></p>"
 			}
 			if (state.activeIncidents != []) {
-				paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%; font-size:90%;">' + incidentsToStr(state.activeIncidents, "table") + "</table>"
+				paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%; font-size:90%;">' + incidentsToStr(state.activeIncidents, "TABLE") + "</table>"
 			} else {
 				paragraph "<p align='center'>No active incidents</p>"
 			}
 			paragraph "<p align='right' style='font-size:90%;'><a href='http://hubitat/installedapp/events/${app.id}'>Incident history</a></p>"
 		}
 	}
-	section("Notification Settings") {
+	section("<b>Notifications</b>") {
 		input "notifyDevice", "capability.notification", title: "Notification device", multiple: false, required: false
 		input "notifyDist", "decimal", title: "Notification distance", defaultValue: 1, required: true
 		input "notifyUnits", "string", title: "Notification unit (if distance is unknown)"
 	}
-	section("Settings") {
+	section("<b>Queries</b>") {
 		input "update_interval", "number", title: "Update frequency (mins)", defaultValue: 5, required: true
 		input "gMapsAPIkey", "string", title: "Google Maps API key", required: false
 	}
-	section("Debug") {
+	section("<b>Debug</b>") {
 		input "debugMode", "bool", title: "Enable debug logging", defaultValue: false
 	}
 }
@@ -195,7 +195,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		//fsIncidents = filterIncidentType(fsIncidents, NO_NOTIFICATION_TYPES())
 		fsIncidents = localIncidents(fsIncidents, notifyUnits)
 		
-		if (fsIncidents && notifyDevice) notifyDevice.deviceNotification incidentsToStr(fsIncidents, "min")	
+		if (fsIncidents && notifyDevice) notifyDevice.deviceNotification incidentsToStr(fsIncidents, "MIN")	
 	}
 	
 	state.activeIncidents = activeIncidents
@@ -329,10 +329,10 @@ String incidentToStr(Map<String, List> inc, String format) {
 	String IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : "[$inc.IncidentTypeName]"
 	String incNum = debugMode ? " ($inc.IncidentNumber)" : ""
 	
-	if (format == "full") { // full was used for logging to sytem logs. Remove?
-		java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
-		out = df.format(toDateTime(inc.ResponseDate)) + incNum + " $inc.CallType $IncidentType $inc.Address$CrossStreet:"
-	} else if (format == "table") {
+	//if (format == "FULL") { // full was used for logging to sytem logs. Remove?
+	//	java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
+	//	out = df.format(toDateTime(inc.ResponseDate)) + incNum + " $inc.CallType $IncidentType $inc.Address$CrossStreet:"
+	if (format == "TABLE") {
 		Integer incMins
 		String incTime
 		String url = ""
@@ -352,17 +352,17 @@ String incidentToStr(Map<String, List> inc, String format) {
 		String td = '<td style="border:1px solid silver;">'
 		String tdc = '</td>'
 		out = td + incTime + tdc + td + " $inc.CallType $IncidentType" + tdc + td + "${url}${inc.Address}${CrossStreet}${ url ? "</a>" : "" }${inc.DistMiles ? sprintf(" (%.1f mi)", inc.DistMiles) : "" }" + tdc + td
-	} else if (format == "min") {
+	} else if (format == "MIN") {
 		out = "$inc.CallType - ${inc.Address}${CrossStreet}${inc.DistMiles ? sprintf(" (%.1fmi)", inc.DistMiles) : ""}:"
-	} else if (format == "updated") {
-		out = "UPDATED" + incNum + " $inc.CallType - ${inc.Address}${CrossStreet}:"
+	//} else if (format == "UPDATED") {
+	//	out = "UPDATED" + incNum + " $inc.CallType - ${inc.Address}${CrossStreet}:"
 	}
 		
 	inc.Units.each {
 		out = out + " $it"
 	}
 	
-	if (format == "table") {
+	if (format == "TABLE") {
 		return "<tr>" + out + "</tr>"
 	} else {
 		return out
