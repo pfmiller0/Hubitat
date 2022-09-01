@@ -336,34 +336,29 @@ String incidentToStr(Map<String, List> inc, String format) {
 	String CrossStreet = inc.CrossStreet ? "|$inc.CrossStreet" : ""
 	String IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : "[$inc.IncidentTypeName]"
 	String incNum = debugMode ? " ($inc.IncidentNumber)" : ""
+	String incDistance = inc.DistMiles ? sprintf(" (%.1f mi)", inc.DistMiles) : ""
+
 	
-	//if (format == "FULL") { // full was used for logging to sytem logs. Remove?
+	//if (format == "full") { // full was used for logging to sytem logs. Remove?
 	//	java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
 	//	out = df.format(toDateTime(inc.ResponseDate)) + incNum + " $inc.CallType $IncidentType $inc.Address$CrossStreet:"
 	if (format == "TABLE") {
 		Integer incMins
 		String incTime
-		String url = ""
-		
-		if (inc?.lat && inc?.lng) {
-			/*** Query format
-			*	z: zoom (1-20)(Doesn't work?)
-			*	t: type ("m" map, "k" satellite, "h" hybrid, "p" terrain, "e" GoogleEarth)
-			*	q: query (loc: lat lon separated by a +)
-			***/
-			url = "<a href='http://maps.google.com/maps?z=20&t=m&q=loc:${inc.lat}+${inc.lng}'>"
-		}
+		String url = "<a href='${getGMapsURL(inc.lat, inc.lng)}'>"
 
 		incMins = getIncidentMinutes(inc.ResponseDate)
 		incTime = sprintf('%d:%02d',(Integer) Math.floor(incMins / 60) ,incMins % 60)
 		
 		String td = '<td style="border:1px solid silver;">'
 		String tdc = '</td>'
-		out = td + incTime + tdc + td + " $inc.CallType $IncidentType" + tdc + td + "${url}${inc.Address}${CrossStreet}${ url ? "</a>" : "" }${inc.DistMiles ? sprintf(" (%.1f mi)", inc.DistMiles) : "" }" + tdc + td
+		out = td + incTime + tdc + td + " $inc.CallType $IncidentType" + tdc + td + "${url}${inc.Address}${CrossStreet}${ url ? "</a>" : "" }${incDistance}" + tdc + td
 	} else if (format == "MIN") {
-		out = "$inc.CallType - ${inc.Address}${CrossStreet}${inc.DistMiles ? sprintf(" (%.1fmi)", inc.DistMiles) : ""}:"
+		out = "$inc.CallType - ${inc.Address}${CrossStreet}${incDistance}:"
 	//} else if (format == "UPDATED") {
 	//	out = "UPDATED" + incNum + " $inc.CallType - ${inc.Address}${CrossStreet}:"
+	} else {
+		log.error "incidentToStr: Invalid option: $format"
 	}
 		
 	inc.Units.each {
@@ -390,6 +385,19 @@ String incidentsToStr(List<Map> incidents, String format) {
 Integer getIncidentMinutes(String responseDate) {
 	// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that part out
 	return  ((now() - toDateTime(responseDate.replaceAll('"\\.[0-9]*-', '-')).getTime()) / (1000 * 60))
+}
+
+String getGMapsURL (Double lat, Double lng) {
+	/*** Query format
+	*	z: zoom (1-20)(Doesn't work?)
+	*	t: type ("m" map, "k" satellite, "h" hybrid, "p" terrain, "e" GoogleEarth)
+	*	q: query (loc: lat lon separated by a +)
+	***/
+	if (lat && lng ) {
+		return "http://maps.google.com/maps?z=20&t=m&q=loc:${inc.lat}+${inc.lng}"
+	} else {
+		return ""
+	}
 }
 
 List<Double> getIncidentCoords(String address, String crossStreets) {
