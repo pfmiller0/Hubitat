@@ -243,14 +243,22 @@ List<Map> getUpdatedActiveIncidents(List<Map> allIncidents, List<Map> activeInci
 	List<Map> updatedInc = []
 	Map prev = null
 	
-	// TODO: Update dist if address changes?
 	allIncidents.each { cur ->
 		prev = activeIncidents.find { it.IncidentNumber == cur.IncidentNumber }
 		if (prev && (cur.CallType != prev.CallType || cur.Units != prev.Units || cur.Address != prev.Address || cur.CrossStreet != prev.CrossStreet)) {
 			//updatedInc << [IncidentNumber: cur.MasterIncidentNumber, ResponseDate: cur.ResponseDate, CallType: cur.CallType, IncidentTypeName: cur.IncidentTypeName, Address: cur.Address, CrossStreet: cur.CrossStreet, Units: cur.Units]
-			cur.lat = prev?.lat
-			cur.lng = prev?.lng
-			cur.DistMiles = prev?.DistMiles
+			if (cur.Address != prev.Address || cur.CrossStreet != prev.CrossStreet) {
+				List<Double> coords
+				coords = getIncidentCoords(cur.Address, cur.CrossStreet)
+				cur.lat = coords[0]
+				cur.lng = coords[1]
+				cur.DistMiles = getDistance(coords, [location.latitude, location.longitude])
+				log.debug "location updated for ${cur.IncidentNumber}"
+			} else {
+				cur.lat = prev.lat
+				cur.lng = prev.lng
+				cur.DistMiles = prev.DistMiles
+			}
 			updatedInc << cur
 		}
 	}
