@@ -172,7 +172,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	fsIncidents = newIncidents(fsIncidents)
 	// Query location of new incidents
 	if (fsIncidents) {
-	List<Double> coords
+		List<Double> coords
 		fsIncidents.eachWithIndex{ inc, i ->
 			coords = getIncidentCoords(inc.Address, inc.CrossStreet)
 			fsIncidents[i].lat = coords[0]
@@ -285,24 +285,29 @@ void logIncidents(List<Map> incidents, String LogType) {
 	String CrossStreet = ""
 	String incDesc = ""
 	String incTime = ""
+	String incDistance = ""
+	String url
 	
 	incidents.each { inc ->
 		IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : " [$inc.IncidentTypeName]"
 		CrossStreet = inc.CrossStreet ? " | $inc.CrossStreet" : ""
+		incDistance = inc.DistMiles ? sprintf(" (%.1f mi)", inc.DistMiles) : ""
+		url = "<a href='${getGMapsURL(inc.lat, inc.lng)}'>"
+
 		if (LogType == "NEW") {
 			java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm")
 			
 			// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that part out
 			incTime = "REC: " + df.format(toDateTime(inc.ResponseDate.replaceAll('"\\.[0-9]*-', '-')))
 			
-			incDesc = "${inc.Address}${CrossStreet}${inc.DistMiles ? sprintf(" (%.1f mi)", inc.DistMiles) : ""}:\n"
+			incDesc = "${url}${inc.Address}${CrossStreet}${url ? "</a>" : ""}${incDistance}:<br>"
 			inc.Units.each {
 				incDesc = incDesc + " $it"
 			}
 		} else if (LogType == "UPDATED") {
 			incTime = "UPDATED"
 			
-			incDesc = "${inc.Address}${CrossStreet}:\n"
+			incDesc = "${url}${inc.Address}${CrossStreet}${url ? "</a>" : ""}${incDistance}:<br>"
 			inc.Units.each {
 				incDesc = incDesc + " $it"
 			}
@@ -320,10 +325,11 @@ void logIncidents(List<Map> incidents, String LogType) {
 			// Don't log short incidents
 			if (incMins <= 20 || incMins <= update_interval*2) return
 			resTime = sprintf('%d:%02d',(Integer) Math.floor(incMins / 60), incMins % 60)
-			
 			incTime = "RESOLVED"
 			
-			incDesc = "${inc.Address}${CrossStreet}:\nIncident time ${resTime}"
+			incDesc = "${url}${inc.Address}${CrossStreet}${url ? "</a>" : ""}${incDistance}:<br>Incident time ${resTime}"
+		} else {
+			log.error "logIncidents: Invalid option: $LogType"
 		}
 		
 		sendEvent(name: "${inc.CallType}${IncidentType}", value: "$inc.IncidentNumber ($incTime)", descriptionText: incDesc) 
