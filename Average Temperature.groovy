@@ -44,6 +44,7 @@ def installed() {
 def updated() {
 	unsubscribe()
 	initialize()
+	offlineCheck()
 }
 
 def uninstalled() {
@@ -65,10 +66,34 @@ def initRun() {
 	}
 }
 
+void offlineCheck() {
+	if (tempSensors.any { it.getStatus() != "ACTIVE" }) {
+		setOfflineLabel()
+	} else {
+		unsetOfflineLabel()
+	}
+}
+
+void setOfflineLabel() {
+	String label = app.getLabel()
+	
+	if ( label.substring(label.length()-2) != " ❌" ) {
+		app.updateLabel(label + " ❌")
+	}
+}
+
+void unsetOfflineLabel() {
+	String label = app.getLabel()
+	
+	if ( label.substring(label.length()-2) == " ❌" ) {
+		app.updateLabel(label.substring(0, label.length()-2))
+	}
+}
+
 Float averageTemp(Integer run = 1) {
 	Float total = 0
 	Float n = 0
-
+	
 	// Todo?: For n devices, get time of n+1th averageDev update back. Any device that hasn't been updated since then give less weight to.
     // How does this handle unequally weighted devices?
 	tempSensors.each {
@@ -134,7 +159,9 @@ Float sensorAverageWeighted(def sensors, Integer field, Float[] coords) {
 def handler(evt) {
 	def averageDev = getChildDevice("AverageTemp_${app.id}")
 	Float avg = averageTemp()
-		
+	
+	offlineCheck()
+	
 	if (useRun > 1) {
 		state.run = state.run.drop(1) + avg
 		avg = averageTemp(useRun)
