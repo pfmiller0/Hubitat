@@ -19,7 +19,7 @@ def mainPage() {
 			input "thisName", "text", title: "Name this temperature averager", submitOnChange: true
 			if(thisName) app.updateLabel("$thisName")
 			input "tempSensors", "capability.temperatureMeasurement", title: "Select Temperature Sensors", submitOnChange: true, required: true, multiple: true
-			paragraph "Enter weight factors"
+			paragraph "Sensor weights"
 			tempSensors.each {
 				if (it.getStatus() == "ACTIVE") {
 					input "weight$it.id", "decimal", title: "$it ($it.currentTemperature)", defaultValue: 1.0, submitOnChange: true, width: 3
@@ -65,9 +65,10 @@ def initRun() {
 	}
 }
 
-def averageTemp(run = 1) {
-	def total = 0
-	def n = 0
+Float averageTemp(Integer run = 1) {
+	Float total = 0
+	Float n = 0
+
 	// Todo?: For n devices, get time of n+1th averageDev update back. Any device that hasn't been updated since then give less weight to.
     // How does this handle unequally weighted devices?
 	tempSensors.each {
@@ -90,8 +91,9 @@ def averageTemp(run = 1) {
 	}
 }
 
+/*
 void updatePastDayAvg() {
-	Float[] hours = state.hours ? state.hours : [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+	Float[] hours = state.hours ?: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 	java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH");
 	Date timeNow = new Date()
 	Date timePrevHour = new Date(now() - 1000 * 60 * 60)
@@ -104,6 +106,7 @@ void updatePastDayAvg() {
 	
 	state.hours = hours
 }
+*/
 
 /* From PurpleAir 
 Float sensorAverageWeighted(def sensors, Integer field, Float[] coords) {
@@ -130,7 +133,8 @@ Float sensorAverageWeighted(def sensors, Integer field, Float[] coords) {
 
 def handler(evt) {
 	def averageDev = getChildDevice("AverageTemp_${app.id}")
-	def avg = averageTemp()
+	Float avg = averageTemp()
+		
 	if (useRun > 1) {
 		state.run = state.run.drop(1) + avg
 		avg = averageTemp(useRun)
