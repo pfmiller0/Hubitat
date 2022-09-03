@@ -20,13 +20,22 @@ definition(
 )
 
 preferences {
+	java.text.SimpleDateFormat df
+	
 	section() {
+		df = new java.text.SimpleDateFormat("h:mm aa")
 		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
-	section("Latest show:") {
-		paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + state.lastTime + "</table>"
+	if (state.todayShow) {
+		section("<b>Today's show</b>") {
+			paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + "${df.format(toDateTime(state.todayShow))}" + "</table>"
+		}
 	}
-	section("Settings:") {
+	section("<b>Last show</b>") {
+		df = new java.text.SimpleDateFormat("h:mm a, d MMM yyyy");
+		paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + "${df.format(toDateTime(state.prevShow ?: "2008-08-08T20:08:08+0700"))}" + "</table>"
+	}
+	section("<b>Settings</b>") {
 		//input "sourceURL", "text", title: "Source URL", required: true, description: "URL to JSON file", defaultValue: "https://www.seaworld.com/api/sitecore/Marquee/LoadDayData?itemId=a6ac339a-375c-461c-9540-faebba25b60c"
 		input "notifyDevice", "capability.notification", title: "Notification device", multiple: false, required: false
 	}
@@ -36,7 +45,7 @@ void initialize() {
 	if (isPaused == false) {
 		resetAppLabel()
 		
-		//state.jsonFieldCount = state.jsonFieldCount ? state.jsonFieldCount : 0
+		//state.jsonFieldCount = state.jsonFieldCount ?: 0
 		unschedule("SiteCheck")
 		schedule('0 1 0 ? * *', "SiteCheck")
 	} else {
@@ -88,25 +97,26 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	Integer fieldCount
 	
 	if (resp.getStatus() != 200 ) {
-		log.debug "HTTP error: " + resp.getStatus()
+		log.error "HTTP error: " + resp.getStatus()
 		return
 	}
 	
-	// resp.getJson().EventGroups[21].Events[0].Title
 	EventsData = resp.getJson().EventGroups
 	EventsData.each { if (it.Events[0].Title.toLowerCase().indexOf("firework") >= 0) {FireworksTime = toDateTime(it.Events[0].StartTime + "-07:00")} }
 	if (FireworksTime) {
-		state.lastTime = "${FireworksTime}"
+		state.prevShow = state.todayShow
+		state.todayShow = FireworksTime
 		Calendar c = Calendar.getInstance()
 		c.setTime(FireworksTime)
-		c.add(Calendar.HOUR, -1)
+		c.add(Calendar.MINUTE, -60)
 		runOnce(c.getTime(), "sendNotice")
-		log.info "Notify at ${c.getTime()}"
+		//log.info "Notify at ${c.getTime()}"
 	} else {
-		log.info "No fireworks"
+		state.todayShow = ""
+		//log.info "No fireworks"
 	}
 	
-	//fieldCount = JWSTData.size()
+	//fieldCount = resp.getJson().size()
 	//if (state.jsonFieldCount != fieldCount ) {
 	//	notifyDevice.deviceNotification 'SeaWorld events JSON file updated!'
 	//	state.jsonFieldCount = fieldCount
@@ -114,5 +124,9 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 }
 
 void sendNotice() {
-	notifyDevice.deviceNotification "SeaWorld fireworks in 1 hour"
+	java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("hh:mm");
+	
+	String showTime = df.format(toDateTime(state.todayShow))
+	
+	notifyDevice.deviceNotification "SeaWorld fireworks at ${showTime}"
 }
