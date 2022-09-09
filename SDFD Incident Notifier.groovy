@@ -54,14 +54,14 @@ List<String> REDUNDANT_TYPES() { ["Advised Incident (misc.)", "Alert 1", "Alert 
 List<String> AMBULANCE_UNITS() { ["M", "AM", "BLS"] }
 	
 void installed() {
-	if (debugMode) log.debug "Installed with settings: ${settings}"
+	//if (debugMode) log.debug "Installed with settings: ${settings}"
 
 	initialize()
 	incidentCheck()
 }
 
 void updated() {
-	if (debugMode) log.debug "Updated with settings: ${settings}"
+	//if (debugMode) log.debug "Updated with settings: ${settings}"
 
 	unsubscribe()
 	unschedule()
@@ -292,7 +292,7 @@ void logIncidents(List<Map> incidents, String LogType) {
 		IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : " [$inc.IncidentTypeName]"
 		CrossStreet = inc.CrossStreet ? " | $inc.CrossStreet" : ""
 		incDistance = inc.DistMiles ? sprintf(" (%.1f mi)", inc.DistMiles) : ""
-		url = "<a href='${getGMapsURL(inc.lat, inc.lng)}'>"
+		url = getGMapsLink((Float)inc.lat, (Float)inc.lng)
 
 		if (LogType == "NEW") {
 			java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm")
@@ -347,7 +347,7 @@ String incidentToStr(Map<String, List> inc, String format) {
 	if (format == "TABLE") {
 		Integer incMins
 		String incTime
-		String url = "<a href='${getGMapsURL(inc.lat, inc.lng)}'>"
+		String url = getGMapsLink(inc.lat, inc.lng)
 
 		incMins = getIncidentMinutes(inc.ResponseDate)
 		incTime = sprintf('%d:%02d',(Integer) Math.floor(incMins / 60) ,incMins % 60)
@@ -388,13 +388,14 @@ Integer getIncidentMinutes(String responseDate) {
 }
 
 String getGMapsLink (Float lat, Float lng) {
-	/*** Query format
-	*	z: zoom (1-20)(Doesn't work?)
-	*	t: type ("m" map, "k" satellite, "h" hybrid, "p" terrain, "e" GoogleEarth)
-	*	q: query (loc: lat lon separated by a +)
+	/*** Query format: https://developers.google.com/maps/documentation/urls/get-started#search-action
+	* query: latitude/longitude coordinates as comma-separated values
+	* zoom: 0 (the whole world) to 21 (individual buildings). The upper limit can vary depending on the map data available at the selected location. The default is 15.
+	* basemap: roadmap (default), satellite, or terrain.
+	* layer: none (default), transit, traffic, or bicycling.
 	***/
 	if (lat && lng ) {
-		return "http://maps.google.com/maps?z=20&t=m&q=loc:${lat}+${lng}"
+		return "<a href='https://www.google.com/maps/search/?api=1&query=${lat}%2C${lng}&zoom=21'>"
 	} else {
 		return ""
 	}
