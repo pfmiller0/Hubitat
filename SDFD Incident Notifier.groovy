@@ -71,10 +71,8 @@ void updated() {
 void initialize() {
 	if (! isPaused) {
 		if (debugMode) {
-			state.prevIncNum = "FS00000000"
 			state.activeIncidents = []
 		} else {
-			state.prevIncNum = state.prevIncNum ?: "FS00000000"
 			state.failCount = state.failCount ?: 0
 		}
 
@@ -114,12 +112,10 @@ void incidentCheck() {
 
 void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	List<Map> allIncidents = []
-	List<Map> fsIncidents = []
-	List<Map> otherIncidents = []
+	List<Map> newIncidents = []
 	List<Map> activeIncidents = []
 	List<Map> resolvedIncidents = []
 	List<Map> updatedActiveIncidents = []
-	String newMaxIncNum = ""
 
 	/***** Backoff on error *****/
 	if (resp.getStatus() != 200 ) {	
@@ -150,8 +146,6 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 
 	// reorganize incident data -> remove ignored types -> remove medical incidents
 	allIncidents = filterMedIncidents(filterIncidentType(cleanupList(resp.getJson()), IGNORE_INC()), AMBULANCE_UNITS())
-	fsIncidents = allIncidents.findAll { it.IncidentNumber.substring(0, 2) == "FS" }
-	otherIncidents = allIncidents.findAll { it.IncidentNumber.substring(0, 2) != "FS" }
 	activeIncidents = state.activeIncidents ?: []
 	
 	// Get and log resolved incidents
@@ -169,40 +163,38 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	if (updatedActiveIncidents) logIncidents(updatedActiveIncidents, "UPDATED")
 	
 	// Get and log new incidents
-	fsIncidents = getNewIncidents(fsIncidents)
+	newIncidents = getNewIncidents(allIncidents, activeIncidents)
+		
 	// Query location of new incidents
-	if (fsIncidents) {
+	if (newIncidents) {
 		List<Float> coords
-		fsIncidents.eachWithIndex{ inc, i ->
+		newIncidents.eachWithIndex{ inc, i ->
 			coords = getIncidentCoords(inc.Address, inc.CrossStreet)
-			fsIncidents[i].lat = coords[0]
-			fsIncidents[i].lng = coords[1]
-			fsIncidents[i].DistMiles = getDistance(coords, [location.latitude, location.longitude])
+			newIncidents[i].lat = coords[0]
+			newIncidents[i].lng = coords[1]
+			newIncidents[i].DistMiles = getDistance(coords, [location.latitude, location.longitude])
 		}
 	}
 	
-	if (fsIncidents) {
-		newMaxIncNum = fsIncidents*.IncidentNumber.max()
-		activeIncidents.addAll(fsIncidents)
+	if (newIncidents) {
+		activeIncidents.addAll(newIncidents)
 		
-		logIncidents(fsIncidents + otherIncidents, "NEW")
-		
-		if (newMaxIncNum > state.prevIncNum) {
-			state.prevIncNum = newMaxIncNum
-		}
-		
+		logIncidents(newIncidents, "NEW")
+				
 		// Get incidents for notification
-		//fsIncidents = filterIncidentType(fsIncidents, NO_NOTIFICATION_TYPES())
-		fsIncidents = getLocalIncidents(fsIncidents, notifyUnits)
+		//newIncidents = filterIncidentType(newIncidents, NO_NOTIFICATION_TYPES())
+		newIncidents = getLocalIncidents(newIncidents, notifyUnits)
 		
-		if (fsIncidents && notifyDevice) notifyDevice.deviceNotification incidentsToStr(fsIncidents, "MIN")	
+		if (newIncidents && notifyDevice) notifyDevice.deviceNotification incidentsToStr(newIncidents, "MIN")	
 	}
 	
 	state.activeIncidents = activeIncidents
 }
 
 List<Map> filterIncidentType(List<Map> incidents, List<String> types) {	
-	return incidents.findAll { inc -> types.every {type -> type != inc.CallType} }
+	return incidents.findAll { inc ->
+		types.every {type -> type != inc.CallType }
+	}
 }
 
 List<Map> filterMedIncidents(List<Map> incidents, List<String> medUnits) {	
@@ -218,19 +210,23 @@ boolean unitCalled(Map<String, List> incident, String unit) {
 }
 
 List<Map> getLocalIncidents(List<Map> incidents, String localUnit) {
-	return incidents.findAll { it.DistMiles ? it.DistMiles < notifyDist : unitCalled(it, localUnit) }
+	return incidents.findAll {
+		it.DistMiles ? it.DistMiles < notifyDist : unitCalled(it, localUnit)
+	}
 }
 
-List<Map> getNewIncidents(List<Map> incidents) {	
-	return incidents.findAll { it.IncidentNumber.substring(2) > state.prevIncNum.substring(2) }
+List<Map> getNewIncidents(List<Map> allIncidents, List<Map> activeIncidents) {	
+	return allIncidents.findAll { inc ->
+		activeIncidents.every {inc.IncidentNumber != it.IncidentNumber}
+	}
 }
 
 List<Map> cleanupList(List<Map> incidents) {
 	List<Map> cleanInc = []
 	
 	incidents.each { inc ->
-		// Drop incidents with no units and invalid inc numbers
-		if (inc.Units.size > 0 && inc.MasterIncidentNumber.length() > 4) {
+		// Drop incidents with no units or IncidentNumber
+		if (inc.Units.size > 0 && inc.MasterIncidentNumber != "") {
 			cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate, CallType: inc.CallType, IncidentTypeName: inc.IncidentTypeName, Address: inc.Address, CrossStreet: inc.CrossStreet, lat: null, lng: null, DistMiles: null, Units: inc.Units*.Code.sort()]
 		}
 	}
