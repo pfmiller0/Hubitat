@@ -401,6 +401,32 @@ String getGMapsLink (Float lat, Float lng) {
 	}
 }
 
+String fixNumAv(String road) {
+	switch (road.toLowerCase()) {
+		case ~/0?4th ave?/:
+			return "Fourth Ave"
+			break
+		case ~/0?5th ave?/:
+			return "Fifth Ave"
+			break
+		case ~/0?6th ave?/:
+			return "Sixth Ave"
+			break
+		case ~/0?8th ave?/:
+			return "Eigth Ave"
+			break
+		case ~/0?9th ave?/:
+			return "Ninth Ave"
+			break
+		case ~/10th ave?/:
+			return "Tenth Ave"
+			break
+		default:
+			return road
+			break
+	}
+}
+
 List<Float> getIncidentCoords(String address, String crossStreets) {
 	String[] streets
 	List<List<Float>> coords = []
@@ -412,16 +438,17 @@ List<Float> getIncidentCoords(String address, String crossStreets) {
 	//log.debug "  getIncidentCoords: address=${address}, crossStreets=${crossStreets}"
 	if ( address =~ /[0-9]+-[0-9]+ .*/ ) {
 		String[] nums = address.substring(0, address.indexOf(" ")).split("-")
-		String street = address.substring(address.indexOf(" "))
+		String street = fixNumAv(address.substring(address.indexOf(" ")))
 		//log.debug "  getIncidentCoords: address range: ${nums} ${street}"
 		coords[0] = gMapsLocationQuery(["${nums[0]} ${street}"])
 		coords[1] = gMapsLocationQuery(["${nums[1]} ${street}"])
 	} else if (crossStreets) {
 		streets = crossStreets.split("/")
-		streets.each{street -> ; c = gMapsLocationQuery([address, street]); if (c) coords << c}
+		String fixedAddress = fixNumAv(address)
+		streets.each{street -> ; c = gMapsLocationQuery([fixedAddress, fixNumAv(street)]); if (c) coords << c}
 	} else {
 		//log.debug "  getIncidentCoords: no cross street"
-		coords[0] = gMapsLocationQuery([address, ""])
+		coords[0] = gMapsLocationQuery([fixNumAv(address), ""])
 	}
 	
 	//log.debug "  getIncidentCoords: coords returned: ${coords}"
