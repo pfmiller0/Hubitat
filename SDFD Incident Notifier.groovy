@@ -172,7 +172,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	fsIncidents = newIncidents(fsIncidents)
 	// Query location of new incidents
 	if (fsIncidents) {
-		List<Double> coords
+		List<Float> coords
 		fsIncidents.eachWithIndex{ inc, i ->
 			coords = getIncidentCoords(inc.Address, inc.CrossStreet)
 			fsIncidents[i].lat = coords[0]
@@ -248,12 +248,12 @@ List<Map> getUpdatedActiveIncidents(List<Map> allIncidents, List<Map> activeInci
 		if (prev && (cur.CallType != prev.CallType || cur.Units != prev.Units || cur.Address != prev.Address || cur.CrossStreet != prev.CrossStreet)) {
 			//updatedInc << [IncidentNumber: cur.MasterIncidentNumber, ResponseDate: cur.ResponseDate, CallType: cur.CallType, IncidentTypeName: cur.IncidentTypeName, Address: cur.Address, CrossStreet: cur.CrossStreet, Units: cur.Units]
 			if (cur.Address != prev.Address || cur.CrossStreet != prev.CrossStreet) {
-				List<Double> coords
+				List<Float> coords
 				coords = getIncidentCoords(cur.Address, cur.CrossStreet)
 				cur.lat = coords[0]
 				cur.lng = coords[1]
 				cur.DistMiles = getDistance(coords, [location.latitude, location.longitude])
-				log.debug "location updated for ${cur.IncidentNumber}"
+				//log.info "location updated for ${cur.IncidentNumber}"
 			} else {
 				cur.lat = prev.lat
 				cur.lng = prev.lng
@@ -343,11 +343,7 @@ String incidentToStr(Map<String, List> inc, String format) {
 	String IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : "[$inc.IncidentTypeName]"
 	String incNum = debugMode ? " ($inc.IncidentNumber)" : ""
 	String incDistance = inc.DistMiles ? sprintf(" (%.1f mi)", inc.DistMiles) : ""
-
 	
-	//if (format == "full") { // full was used for logging to sytem logs. Remove?
-	//	java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm:ss");
-	//	out = df.format(toDateTime(inc.ResponseDate)) + incNum + " $inc.CallType $IncidentType $inc.Address$CrossStreet:"
 	if (format == "TABLE") {
 		Integer incMins
 		String incTime
@@ -361,8 +357,6 @@ String incidentToStr(Map<String, List> inc, String format) {
 		out = td + incTime + tdc + td + " $inc.CallType $IncidentType" + tdc + td + "${url}${inc.Address}${CrossStreet}${ url ? "</a>" : "" }${incDistance}" + tdc + td
 	} else if (format == "MIN") {
 		out = "$inc.CallType - ${inc.Address}${CrossStreet}${incDistance}:"
-	//} else if (format == "UPDATED") {
-	//	out = "UPDATED" + incNum + " $inc.CallType - ${inc.Address}${CrossStreet}:"
 	} else {
 		log.error "incidentToStr: Invalid option: $format"
 	}
@@ -393,7 +387,7 @@ Integer getIncidentMinutes(String responseDate) {
 	return  ((now() - toDateTime(responseDate.replaceAll('"\\.[0-9]*-', '-')).getTime()) / (1000 * 60))
 }
 
-String getGMapsURL (Double lat, Double lng) {
+String getGMapsLink (Float lat, Float lng) {
 	/*** Query format
 	*	z: zoom (1-20)(Doesn't work?)
 	*	t: type ("m" map, "k" satellite, "h" hybrid, "p" terrain, "e" GoogleEarth)
@@ -406,28 +400,27 @@ String getGMapsURL (Double lat, Double lng) {
 	}
 }
 
-List<Double> getIncidentCoords(String address, String crossStreets) {
+List<Float> getIncidentCoords(String address, String crossStreets) {
 	String[] streets
-	List<List<Double>> coords = []
-	List<Double> c = [0.0, 0.0]
+	List<List<Float>> coords = []
+	List<Float> c = [0.0, 0.0]
 	Integer cCount = 0
 	
 	if (! gMapsAPIkey) return []
 	
 	//log.debug "  getIncidentCoords: address=${address}, crossStreets=${crossStreets}"
-	
 	if ( address =~ /[0-9]+-[0-9]+ .*/ ) {
 		String[] nums = address.substring(0, address.indexOf(" ")).split("-")
 		String street = address.substring(address.indexOf(" "))
 		//log.debug "  getIncidentCoords: address range: ${nums} ${street}"
 		coords[0] = gMapsLocationQuery(["${nums[0]} ${street}"])
 		coords[1] = gMapsLocationQuery(["${nums[1]} ${street}"])
-	} else if (crossStreets != null ) {
+	} else if (crossStreets) {
 		streets = crossStreets.split("/")
 		streets.each{street -> ; c = gMapsLocationQuery([address, street]); if (c) coords << c}
 	} else {
 		//log.debug "  getIncidentCoords: no cross street"
-		coords[0] = gMapsLocationQuery([address, street])
+		coords[0] = gMapsLocationQuery([address, ""])
 	}
 	
 	//log.debug "  getIncidentCoords: coords returned: ${coords}"
@@ -437,10 +430,12 @@ List<Double> getIncidentCoords(String address, String crossStreets) {
 	coords.each {if (it) {cCount++; c[0] += it[0]; c[1] += it[1]}}
 	
 	if (cCount > 0) {
-		c = [c[0] / (Double) cCount, c[1] / (Double) cCount]
+		c = [c[0] / (Float) cCount, c[1] / (Float) cCount]
 	} else {
 		c = []
-		log.debug sprintf("%s|%s: [%.4f, %.4f], dist: %.1f", address, crossStreets, c[0], c[1], getDistance(c, [location.latitude, location.longitude]))
+		if ( ! (" $address $crossStreets".toUpperCase() =~ / I-[0-9]+| SR-[0-9]+| INTERSTATE [0-9]+/ ) ) {
+			log.debug sprintf("%s|%s: [%.4f, %.4f], dist: %.1f", address, crossStreets, c[0], c[1], getDistance(c, [location.latitude, location.longitude]))
+		}
 	}
 	
 	return c
@@ -450,15 +445,14 @@ List<Double> getIncidentCoords(String address, String crossStreets) {
  * Google API to convert streets to coordinates
  * 
  * https://developers.google.com/maps/documentation/geocoding/overview
- * https://developers.google.com/maps/documentation/geocoding/requests-geocoding
  *  --> Requires api key. 40,000 free queries per month
  */
-List<Double> gMapsLocationQuery(List<String> intersection) {
+List<Float> gMapsLocationQuery(List<String> intersection) {
 	String url="https://maps.googleapis.com/maps/api/geocode/json"
 	String sdLocationComponents = "locality:San Diego|administrative_area_level_1:CA|country:US"
 	String queryAddr = ""
 	Map httpQuery
-	Double[] coords = [0.0, 0.0]
+	Float[] coords = [0.0, 0.0]
 	
 	if (intersection.size() == 1) {
 		queryAddr = intersection[0] + ", San Diego, CA, US"
@@ -487,7 +481,6 @@ List<Double> gMapsLocationQuery(List<String> intersection) {
 			//log.debug "Request was successful, $resp.status"
 			Map result
 			result=resp.getData().results.find { it.types == ["street_number"] || it.types == ["intersection"] || it.types == ["street_address"] || it.location_type == "RANGE_INTERPOLATED"}
-			//result=resp.getData().results[0]
 			if (result) {
 			//if (result.types[0] == "street_number" || result.types[0] == "intersection") {
 				coords[0]=result.geometry.location.lat
@@ -510,7 +503,7 @@ List<Double> gMapsLocationQuery(List<String> intersection) {
 	}
 }
 
-Double getDistance(List<Double> coorda, List<Double> coordb) {
+Float getDistance(List<Float> coorda, List<Float> coordb) {
 	if (! coorda || ! coordb ) return null
 		
 	// Haversine function from http://www.movable-type.co.uk/scripts/latlong.html
@@ -524,5 +517,5 @@ Double getDistance(List<Double> coorda, List<Double> coordb) {
 	Double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 
 	Double d = (R * c) / 1000; // in km
-	return d / 1.609 // in miles
+	return (Float) d / 1.609 // in miles
 }
