@@ -169,7 +169,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	if (updatedActiveIncidents) logIncidents(updatedActiveIncidents, "UPDATED")
 	
 	// Get and log new incidents
-	fsIncidents = newIncidents(fsIncidents)
+	fsIncidents = getNewIncidents(fsIncidents)
 	// Query location of new incidents
 	if (fsIncidents) {
 		List<Float> coords
@@ -193,7 +193,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		
 		// Get incidents for notification
 		//fsIncidents = filterIncidentType(fsIncidents, NO_NOTIFICATION_TYPES())
-		fsIncidents = localIncidents(fsIncidents, notifyUnits)
+		fsIncidents = getLocalIncidents(fsIncidents, notifyUnits)
 		
 		if (fsIncidents && notifyDevice) notifyDevice.deviceNotification incidentsToStr(fsIncidents, "MIN")	
 	}
@@ -217,11 +217,11 @@ boolean unitCalled(Map<String, List> incident, String unit) {
 	return incident.Units.any { it == unit }
 }
 
-List<Map> localIncidents(List<Map> incidents, String localUnit) {
+List<Map> getLocalIncidents(List<Map> incidents, String localUnit) {
 	return incidents.findAll { it.DistMiles ? it.DistMiles < notifyDist : unitCalled(it, localUnit) }
 }
 
-List<Map> newIncidents(List<Map> incidents) {	
+List<Map> getNewIncidents(List<Map> incidents) {	
 	return incidents.findAll { it.IncidentNumber.substring(2) > state.prevIncNum.substring(2) }
 }
 
