@@ -436,7 +436,11 @@ List<Float> getIncidentCoords(String address, String crossStreets) {
 	if (! gMapsAPIkey) return []
 	
 	//log.debug "  getIncidentCoords: address=${address}, crossStreets=${crossStreets}"
-	if ( address =~ /[0-9]+-[0-9]+ .*/ ) {
+	if ( address.contains("°") ) {
+		String[] coordDegrees = address.split("&")
+		coords[0] = [deg2dec(coordDegrees[0].trim()), deg2dec(coordDegrees[1].trim())]
+		//log.debug coords[0]
+	} else if ( address =~ /[0-9]+-[0-9]+ .*/ ) {
 		String[] nums = address.substring(0, address.indexOf(" ")).split("-")
 		String street = fixNumAv(address.substring(address.indexOf(" ")))
 		//log.debug "  getIncidentCoords: address range: ${nums} ${street}"
@@ -546,4 +550,12 @@ Float getDistance(List<Float> coorda, List<Float> coordb) {
 
 	Double d = (R * c) / 1000; // in km
 	return (Float) d / 1.609 // in miles
+}
+
+Float deg2dec(String coordDegrees) {
+	Float coordDec = 0.0
+	List tokens = coordDegrees.tokenize('°\'"')
+	coordDec = Float.parseFloat(tokens[0]) + Float.parseFloat(tokens[1])/60 + Float.parseFloat(tokens[2])/3600
+	if (tokens[3] == "w" || tokens[3] == "s" ) coordDec = -coordDec
+	return coordDec
 }
