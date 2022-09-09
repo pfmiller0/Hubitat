@@ -24,7 +24,7 @@ preferences {
 	if (state.activeIncidents != null) {
 		section("<b>Active Incidents</b>") {
 			if (state.failCount > 0 ) {
-				paragraph "<p align='center' style='font-size:110%;'><b>Connection down!</b></p>"
+				paragraph "<p align='center' style='font-size:110%;'><b>Connection down! (fails=${state.failCount})</b></p>"
 			}
 			if (state.activeIncidents != []) {
 				paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%; font-size:90%;">' + incidentsToStr(state.activeIncidents, "TABLE") + "</table>"
