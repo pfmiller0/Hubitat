@@ -227,7 +227,7 @@ List<Map> cleanupList(List<Map> incidents) {
 	incidents.each { inc ->
 		// Drop incidents with no units or IncidentNumber
 		if (inc.Units.size > 0 && inc.MasterIncidentNumber != "") {
-			cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate, CallType: inc.CallType, IncidentTypeName: inc.IncidentTypeName, Address: inc.Address, CrossStreet: inc.CrossStreet, lat: null, lng: null, DistMiles: null, Units: inc.Units*.Code.sort()]
+			cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate, CallType: inc.CallType, IncidentTypeName: inc.IncidentTypeName, Address: toTitleCase(inc.Address), CrossStreet: toTitleCase(inc.CrossStreet), lat: null, lng: null, DistMiles: null, Units: inc.Units*.Code.sort()]
 		}
 	}
 	//log.debug "size: ${incidents.size()}, clean: ${cleanInc.size()}"
@@ -554,4 +554,11 @@ Float deg2dec(String coordDegrees) {
 	coordDec = Float.parseFloat(tokens[0]) + Float.parseFloat(tokens[1])/60 + Float.parseFloat(tokens[2])/3600
 	if (tokens[3] == "w" || tokens[3] == "s" ) coordDec = -coordDec
 	return coordDec
+}
+
+String toTitleCase (String s){
+	if (s) {
+		return s.replaceAll(/\w+/) { w -> w.toLowerCase().capitalize() }
+	}
+	return s
 }
