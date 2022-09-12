@@ -294,7 +294,7 @@ void logIncidents(List<Map> incidents, String LogType) {
 			java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm")
 			
 			// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that part out
-			incTime = "REC: " + df.format(toDateTime(inc.ResponseDate.replaceAll('"\\.[0-9]*-', '-')))
+			incTime = "REC: " + df.format(toDateTime(inc.ResponseDate.replaceAll('\\.[0-9]{2}-', '-')))
 			
 			incDesc = "${url}${inc.Address}${CrossStreet}${url ? "</a>" : ""}${incDistance}:<br>"
 			inc.Units.each {
