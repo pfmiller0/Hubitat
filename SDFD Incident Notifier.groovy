@@ -380,7 +380,7 @@ String incidentsToStr(List<Map> incidents, String format) {
 
 Integer getIncidentMinutes(String responseDate) {
 	// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that part out
-	return  ((now() - toDateTime(responseDate.replaceAll('"\\.[0-9]*-', '-')).getTime()) / (1000 * 60))
+	return  ((now() - toDateTime(responseDate.replaceAll('\\.[0-9]{2}-', '-')).getTime()) / (1000 * 60))
 }
 
 String getGMapsLink (Float lat, Float lng) {
