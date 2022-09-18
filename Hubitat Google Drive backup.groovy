@@ -30,7 +30,7 @@ definition(
 	parent: "hyposphere.net:P's Utilities",
 	author: 'Pete Miller',
 	description: 'Automatically upload Hubitat Hub backup to Google Drive account',
-	//importUrl: 'https://raw.githubusercontent.com/dkilgore90/google-sdm-api/master/sdm-api-app.groovy',
+	importUrl: 'https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Hubitat%20Google%20Drive%20backup.groovy',
 	category: 'Discovery',
 	oauth: true,
 	iconUrl: '',
