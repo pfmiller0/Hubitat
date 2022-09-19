@@ -34,8 +34,7 @@ definition(
 	category: 'Discovery',
 	oauth: true,
 	iconUrl: '',
-	iconX2Url: '',
-	iconX3Url: ''
+	iconX2Url: ''
 )
 
 preferences {
@@ -54,11 +53,6 @@ mappings {
             GET: "handleAuthRedirect"
         ]
     }
-//    path("/img/:deviceId") {
-//        action: [
-//            GET: "getDashboardImg"
-//        ]
-//    }
 }
 
 private logDebug(msg) {
@@ -75,6 +69,7 @@ def mainPage() {
 		
         section {
             input 'credsJson', 'text', title: 'Google credentials.json', required: true, submitOnChange: false
+			input "BackupTrigger", "capability.switch", title: "Backup trigger switch", multiple: false
         }
         getAuthLink()
 
@@ -176,22 +171,22 @@ def mainPageLink() {
 }
 
 def updated() {
+		unschedule()
+    	unsubscribe()
 	if (isPaused == false) {
-		log.info 'Hubitat Google Drive Backup updating'
 		rescheduleLogin()
 		//runEvery10Minutes('checkGoogle')
 		//schedule('0 0 23 ? * *', 'driveRetentionJob')
 		schedule('0 0 9 ? * *', 'downloadLatestBackup')
+		subscribe(BackupTrigger, 'switch.on', 'downloadLatestBackup')
 		subscribe(location, 'systemStart', 'initialize')
 	} else {
-		log.info 'Hubitat Google Drive Backup paused: Unscheduling'
-    	unschedule()
+		unschedule()
     	unsubscribe()
 	}
 }
 
 def installed() {
-    log.info 'Hubitat Google Drive Backup installed'
     //initialize()
     createAccessToken()
     //runEvery10Minutes checkGoogle
@@ -200,7 +195,6 @@ def installed() {
 }
 
 def uninstalled() {
-    log.info 'Hubitat Google Drive Backup uninstalling'
     unschedule()
     unsubscribe()
 }
@@ -302,17 +296,6 @@ def logToken() {
     log.debug("Access Token: ${state.googleAccessToken}")
 }
 
-/*def refreshAll() {
-    log.info('Dropping stale events with timestamp < now, and refreshing devices')
-    state.lastRecovery = now()
-    def children = getChildDevices()
-    children.each {
-        if (it != null) {
-            getDeviceData(it)
-        }
-    }
-} */
-
 void testButton() {
 	downloadLatestBackup()
 	//if (! state.folderId) createFolder()
@@ -320,18 +303,19 @@ void testButton() {
 }
 
 String getDownloadFilename(resp) {
-	def contentDisposition = resp.getHeaders()["Content-Disposition"]
+	String contentDisposition = resp.getHeaders()["Content-Disposition"]
 	
 	// Content-Disposition field:
 	//    attachment; filename=Home_2021-07-05~2.2.7.128.lzf
-	logDebug "get name 1: ${contentDisposition}"
-	logDebug "get name 2: ${(contentDisposition =~ /filename=(.+)/)}"
-	logDebug "get name 3: ${(contentDisposition =~ /filename=(.+)/)[ 0 ]}"
-	logDebug "get name 4: ${(contentDisposition =~ /filename=(.+)/)[ 0 ][ 1 ]}"
-	return (contentDisposition =~ /filename=(.+)/)[ 0 ][ 1 ]
+	def match = contentDisposition =~ /^.*filename=(?<file>.+)$/
+	if ( match.matches() ) {
+		return match.group("file")
+	} else {
+		return "unknown.file"
+	}
 }
 
-void downloadLatestBackup() {
+void downloadLatestBackup(evt) {
 	String uri = 'http://' + location.hub.localIP + ':8080/hub/backupDB?fileName=latest'
 	//String uri = 'http://' + location.hub.localIP + ':8080/local/backup_test.file'
 	
@@ -346,7 +330,7 @@ void downloadLatestBackup() {
 	try {
 		asynchttpGet('handleDownloadLatestBackup', params, [data: null])
 	} catch (e) {
-		if (debugMode) log.debug "There was an error: $e"	
+		logDebug "There was an error: $e"	
 	}
 }
 
@@ -358,12 +342,13 @@ void handleDownloadLatestBackup(hubitat.scheduling.AsyncResponse resp, Map data)
 
 		return
 	}
-
+	
 	name = getDownloadFilename(resp)
 	logDebug "Downloaded file (name: ${name})"
-	//log.debug "HTTP download data (raw): " + resp.getData()
-	//log.debug "HTTP download data (decoded): " + resp.decodeBase64()
-
+	/***
+	log.debug "HTTP download data (raw): " + resp.getData()
+	log.debug "HTTP download data (decoded): " + resp.decodeBase64()
+	/***/
 	backupFile = resp.getData()
 	
 	if (! state.folderId) createFolder()
@@ -449,6 +434,7 @@ def handleUploadDrive(resp, data) {
             log.error("Upload data to file -- response code: ${respCode}, body: ${respError}")
         }
     } else {
+		log.info("Backup file uploaded successfully")
 		logDebug("Getting file info for new file")
 		getAppDataDrive(data.fileId)
     }
@@ -527,7 +513,7 @@ def handleCreateFolder(resp, data) {
         def respJson = resp.getJson()
 		log.debug "folder id returned: ${respJson.id}"
         state.folderId = (respJson.id)
-        setFolderPermissions(respJson.id)
+        //setFolderPermissions(respJson.id)
     }
 }
 
