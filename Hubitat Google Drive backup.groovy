@@ -69,6 +69,7 @@ def mainPage() {
 		
 		section {
 			input 'credsJson', 'text', title: 'Google credentials.json', required: true, submitOnChange: false
+			input 'retentionDays', 'number', title: 'Retention days', required: true, defaultValue: 14, submitOnChange: false
 			input "BackupTrigger", "capability.switch", title: "Backup trigger switch", multiple: false
 		}
 		getAuthLink()
@@ -93,7 +94,8 @@ def debugPage() {
 			input 'refreshToken', 'button', title: 'Force Token Refresh', submitOnChange: true
 		}
 		section("Test") {
-			input name: "btnTest", type: "button", title: "Test"
+			input name: "btnRunBackup", type: "button", title: "Test backup"
+			input name: "btnRunCleanup", type: "button", title: "Test cleanup"
 		}
 	}
 }
@@ -176,7 +178,7 @@ def updated() {
 	if (isPaused == false) {
 		rescheduleLogin()
 		//runEvery10Minutes('checkGoogle')
-		//schedule('0 0 23 ? * *', 'driveRetentionJob')
+		schedule('0 0 23 ? * *', 'driveRetentionJob')
 		schedule('0 0 9 ? * *', 'downloadLatestBackup')
 		subscribe(BackupTrigger, 'switch.on', 'downloadLatestBackup')
 		subscribe(location, 'systemStart', 'initialize')
@@ -294,12 +296,6 @@ def putResponse(resp, data) {
 
 def logToken() {
 	log.debug("Access Token: ${state.googleAccessToken}")
-}
-
-void testButton() {
-	downloadLatestBackup()
-	//if (! state.folderId) createFolder()
-	//createFile(file, name)
 }
 
 String getDownloadFilename(resp) {
@@ -554,19 +550,16 @@ def handleSetPermissions(resp, data) {
 	}
 }
 
-/*
-def getFilesToDelete(device) {
+def getFilesToDelete(folderId) {
 	def retentionDate = new Date(now() - (1000 * 3600 * 24 * retentionDays)).format("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", TimeZone.getTimeZone("UTC"))
-	def fullDevice = getChildDevice(device.getDeviceNetworkId())
-	def folderId = fullDevice.getFolderId()
 	def uri = 'https://www.googleapis.com/drive/v3/files'
 	def headers = [ Authorization: "Bearer ${state.googleAccessToken}" ]
 	def contentType = 'application/json'
 	def query = [ q: "modifiedTime < '${retentionDate}' and '${folderId}' in parents" ]
 	def params = [ uri: uri, headers: headers, contentType: contentType, query: query ]
-	log.info("Retrieving files to delete for device: ${device}, based on retentionDays: ${retentionDays}")
+	log.info("Retrieving files to delete based on retentionDays: ${retentionDays}")
 	logDebug(params)
-	asynchttpGet(handleGetFilesToDelete, params, [device: device, params: params])
+	asynchttpGet(handleGetFilesToDelete, params, [params: params])
 }
 
 def handleGetFilesToDelete(resp, data) {
@@ -595,17 +588,18 @@ def handleGetFilesToDelete(resp, data) {
 		def nextPage = respJson.nextPageToken ? true : false
 		def idList = []
 		respJson.files.each {
+			log.debug "File to delete: ${it.name}"
 			idList.add(it.id)
 		}
 		if (idList) {
-			deleteFilesBatch(data.device, idList, nextPage)
+			deleteFilesBatch(idList, nextPage)
 		} else {
-			log.info("No files found to delete -- device: ${data.device}")
+			log.info("No files found to delete")
 		}
 	}
 }
 
-def deleteFilesBatch(device, idList, nextPage) {
+def deleteFilesBatch(idList, nextPage) {
 	def uri = 'https://www.googleapis.com/batch/drive/v3'
 	def headers = [
 		Authorization: "Bearer ${state.googleAccessToken}",
@@ -621,9 +615,9 @@ def deleteFilesBatch(device, idList, nextPage) {
 	builder << '--END_OF_PART--'
 	def body = builder.toString()
 	def params = [ uri: uri, headers: headers, body: body, requestContentType: requestContentType ]
-	log.info("Sending batched file delete request -- count: ${idList.size()} -- for device: ${device}")
-	logDebug(body)
-	asynchttpPost(handleDeleteFilesBatch, params, [device: device, params: params, nextPage: nextPage])
+	log.info("Sending batched file delete request -- count: ${idList.size()}")
+	log.debug(body)
+	//asynchttpPost(handleDeleteFilesBatch, params, [device: device, params: params, nextPage: nextPage])
 }
 
 def handleDeleteFilesBatch(resp, data) {
@@ -648,27 +642,24 @@ def handleDeleteFilesBatch(resp, data) {
 			asynchttpPost(handleDeleteFilesBatch, data.params, data)
 		}
 		if (data.nextPage) {
-			log.info("Additional pages of files to delete for device: ${data.device} -- will run query sequence again")
-			getFilesToDelete(data.device)
+			log.info("Additional pages of files to delete -- will run query sequence again")
+			getFilesToDelete(state.folderId)
 		}
 	}
 }
 
 def driveRetentionJob() {
 	log.info('Running Google Drive retention cleanup job')
-	def children = getChildDevices()
-	children.each {
-		if (it.hasCapability('ImageCapture')) {
-			getFilesToDelete(it)
-		}
-	}
+	getFilesToDelete(state.folderId)
 }
-*/
 
 void appButtonHandler(String btn) {
 	switch (btn) {
-	case "btnTest":
-		testButton()
+	case "btnRunBackup":
+		downloadLatestBackup()
+		break
+	case "btnRunCleanup":
+		driveRetentionJob()
 		break
 	default:
 		log.warn "Unhandled button press: $btn"
