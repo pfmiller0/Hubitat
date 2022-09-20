@@ -37,8 +37,8 @@ void initialize() {
 	if (isPaused == false) {
 		resetAppLabel()
 		
-		state.lastTemp = state.lastTemp ? state.lastTemp : [tempWarmSide1: 0, tempWarmSide2: 0, tempCoolSide1: 0, tempCoolSide2: 0, tempInstMiriK: 0, tempInstNirCamK: 0, tempInstNirSpecK: 0, tempInstFgsNirissK: 0, tempInstFsmK: 0]
-		state.jsonFieldCount = state.jsonFieldCount ? state.jsonFieldCount : 0
+		state.lastTemp = state.lastTemp ?: [tempWarmSide1: 0, tempWarmSide2: 0, tempCoolSide1: 0, tempCoolSide2: 0, tempInstMiriK: 0, tempInstNirCamK: 0, tempInstNirSpecK: 0, tempInstFgsNirissK: 0, tempInstFsmK: 0]
+		state.jsonFieldCount = state.jsonFieldCount ?: 0
 		
 		if ( update_interval == "15" ) {
 			runEvery15Minutes('JWSTCheck')
@@ -118,18 +118,6 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 
 		//notifyDevice.deviceNotification "JWST Temp updated: $JWSTTemp"
 		notifyDevice.deviceNotification "JWST Temp updated: $JWSTTempChanges"
-		
-		/*
-		sendEvent(name: "tempWarmSide1", value: JWSTTemp.tempWarmSide1, unit: "K")
-		sendEvent(name: "tempWarmSide2", value: JWSTTemp.tempWarmSide2, unit: "K")
-		sendEvent(name: "tempCoolSide1", value: JWSTTemp.tempCoolSide1, unit: "K")
-		sendEvent(name: "tempCoolSide2", value: JWSTTemp.tempCoolSide2, unit: "K")
-		sendEvent(name: "tempInstMiriK", value: JWSTTemp.tempInstMiriK, unit: "K")
-		sendEvent(name: "tempInstNirCamK", value: JWSTTemp.tempInstNirCamK, unit: "K")
-		sendEvent(name: "tempInstNirSpecK", value: JWSTTemp.tempInstNirSpecK, unit: "K")
-		sendEvent(name: "tempInstFgsNirissK", value: JWSTTemp.tempInstFgsNirissK, unit: "K")
-		sendEvent(name: "tempInstFsmK", value: JWSTTemp.tempInstFsmK, unit: "K")
-		*/
 		
 		JWSTTempChanges.each { key, val ->
 			if (val != "🚫") {
