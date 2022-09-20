@@ -8,15 +8,15 @@
 import Math.*
 
 definition(
-    name: "JWST Temp Check",
-    namespace: "hyposphere.net",
+	name: "JWST Temp Check",
+	namespace: "hyposphere.net",
 	parent: "hyposphere.net:P's Utilities",
-    author: "Peter Miller",
-    description: "JWST Temp Check",
-    category: "My Apps",
-    iconUrl: "",
-    iconX2Url: "",
-    importUrl: ""
+	author: "Peter Miller",
+	description: "JWST Temp Check",
+	category: "My Apps",
+	iconUrl: "",
+	iconX2Url: "",
+	importUrl: ""
 )
 
 preferences {
@@ -72,8 +72,8 @@ def uninstalled() {
 void JWSTCheck() {
 	String url=sourceURL
 
-    Map params = [
-	    uri: url,
+	Map params = [
+		uri: url,
 		requestContentType: "application/json",
 		contentType: "application/json",
 		timeout: 30,
