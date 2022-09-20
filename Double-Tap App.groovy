@@ -31,13 +31,11 @@ preferences {
 
 def installed() {
 	if (logDebug) log.debug "Installed with settings: ${settings}"
-
 	initialize()
 }
 
 def updated() {
 	if (logDebug) log.debug "Updated with settings: ${settings}"
-
 	unsubscribe()
 	initialize()
 }
@@ -45,7 +43,6 @@ def updated() {
 def initialize() {
 	if (isPaused == false) {
 		subscribe(roomButton, buttonAction, buttonHandler)
-
 		state.LastPress = 0
 	}
 }
