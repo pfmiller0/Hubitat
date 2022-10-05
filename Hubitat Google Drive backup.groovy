@@ -69,8 +69,9 @@ def mainPage() {
 		
 		section {
 			input 'credsJson', 'text', title: 'Google credentials.json', required: true, submitOnChange: false
+			input 'backupTime', 'time', title: 'Backup at this time:', required: true, defaultValue: '08:45 AM'
 			input 'retentionDays', 'number', title: 'Retention days', required: true, defaultValue: 14, submitOnChange: false
-			input "BackupTrigger", "capability.switch", title: "Backup trigger switch", multiple: false
+			input "backupTrigger", "capability.switch", title: "Backup trigger switch", multiple: false
 		}
 		getAuthLink()
 
@@ -178,9 +179,9 @@ def updated() {
 	if (isPaused == false) {
 		rescheduleLogin()
 		//runEvery10Minutes('checkGoogle')
-		schedule('0 0 23 ? * *', 'driveRetentionJob')
-		schedule('0 0 9 ? * *', 'downloadLatestBackup')
-		subscribe(BackupTrigger, 'switch.on', 'downloadLatestBackup')
+		schedule(backupTime, 'downloadLatestBackup')
+		schedule('0 15 9 ? * *', 'driveRetentionJob')
+		subscribe(backupTrigger, 'switch.on', 'downloadLatestBackup')
 		subscribe(location, 'systemStart', 'initialize')
 	} else {
 		unschedule()
