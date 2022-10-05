@@ -352,7 +352,7 @@ void handleDownloadLatestBackup(hubitat.scheduling.AsyncResponse resp, Map data)
 	/***/
 	backupFile = resp.getData()
 	
-	if (! state.folderId) createFolder()
+	if (! state.folderId) createFolder('Hubitat Backups')
 	createFile(backupFile, name)
 }
 
@@ -475,14 +475,14 @@ def handleGetAppDataDrive(resp, data) {
 	}
 }
 
-def createFolder() {
+def createFolder(String name, String parent='root') {
 	def uri = 'https://www.googleapis.com/drive/v3/files'
 	def headers = [ Authorization: "Bearer ${state.googleAccessToken}" ]
 	def contentType = 'application/json'
 	def body = [
 		mimeType: 'application/vnd.google-apps.folder',
-		parents: 'root',
-		name: 'Hubitat Backups' // folder name
+		parents: parent,
+		name: name
 	]
 	def params = [ uri: uri, headers: headers, contentType: contentType, body: body ]
 	log.info("Creating Google Drive folder")
