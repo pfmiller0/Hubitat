@@ -312,7 +312,12 @@ String getDownloadFilename(resp) {
 	}
 }
 
-void downloadLatestBackup(evt) {
+def driveRetentionJob() {
+	log.info('Running Google Drive retention cleanup job')
+	getFilesToDelete(state.folderId)
+}
+
+void downloadLatestBackup() {
 	String uri = 'http://' + location.hub.localIP + ':8080/hub/backupDB?fileName=latest'
 	//String uri = 'http://' + location.hub.localIP + ':8080/local/backup_test.file'
 	
@@ -647,11 +652,6 @@ def handleDeleteFilesBatch(resp, data) {
 			getFilesToDelete(state.folderId)
 		}
 	}
-}
-
-def driveRetentionJob() {
-	log.info('Running Google Drive retention cleanup job')
-	getFilesToDelete(state.folderId)
 }
 
 void appButtonHandler(String btn) {
