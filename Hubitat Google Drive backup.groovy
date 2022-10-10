@@ -62,23 +62,22 @@ private logDebug(msg) {
 }
 
 def mainPage() {
-	dynamicPage(name: "mainPage", title: "Setup", install: true, uninstall: true) {
+	dynamicPage(name: 'mainPage', title: 'Setup', install: true, uninstall: true) {
 		section() {
-			input "isPaused", "bool", title: "Pause app", defaultValue: false
+			input 'isPaused', 'bool', title: 'Pause app', defaultValue: false
 		}
 		
-		section {
+		section() {
 			input 'credsJson', 'text', title: 'Google credentials.json', required: true, submitOnChange: false
 			input 'backupTime', 'time', title: 'Backup at this time:', required: true, defaultValue: '08:45 AM'
 			input 'retentionDays', 'number', title: 'Retention days', required: true, defaultValue: 14, submitOnChange: false
-			input "backupTrigger", "capability.switch", title: "Backup trigger switch", multiple: false
+			input 'backupTrigger', 'capability.switch', title: 'Backup trigger switch', multiple: false
 		}
 		getAuthLink()
 
-		section{
-			input name: "debugOutput", type: "bool", title: "Enable Debug Logging?", defaultValue: false, submitOnChange: true
-		}
-				
+		section() {
+			input 'debugOutput', 'bool', title: 'Enable Debug Logging?', defaultValue: false, submitOnChange: true
+		}		
 		getDebugLink()
 	}
 }
@@ -100,7 +99,7 @@ def getAuthLink() {
 	if (credsJson && state?.accessToken) {
 		section {
 			href(
-				name	   : 'authHref',
+				name	: 'authHref',
 				title	  : 'Auth Link',
 				url		: buildAuthUrl(),
 				description: 'Click this link to authorize with your Google Drive account'
@@ -130,7 +129,7 @@ def getDebugLink() {
 			name	   : 'debugHref',
 			title	  : 'Debug buttons',
 			page	   : 'debugPage',
-			description: 'Access debug buttons (log current googleAccessToken, force googleAccessToken refresh)'
+			description: 'Access debug buttons'
 		)
 	}
 }
@@ -198,13 +197,7 @@ def uninstalled() {
 }
 
 def initialize(evt) {
-	log.debug(evt)
-	recover()
-}
-
-def recover() {
 	rescheduleLogin()
-	refreshAll()
 }
 
 def rescheduleLogin() {
@@ -574,14 +567,15 @@ def handleCreateFolder(resp, data) {
 		} else {
 			log.error("Create folder -- response code: ${respCode}, body: ${respError}")
 		}
+		return null
 	} else {
 		def respJson = resp.getJson()
 		log.debug "folder id returned: ${respJson.id}"
 		state.folderId = (respJson.id)
-		//setFolderPermissions(respJson.id)
 	}
 }
 
+/***
 def setFolderPermissions(folderId) {
 	def uri = "https://www.googleapis.com/drive/v3/files/${folderId}/permissions"
 	def headers = [ Authorization: "Bearer ${state.googleAccessToken}" ]
@@ -619,8 +613,12 @@ def handleSetPermissions(resp, data) {
 		}
 	}
 }
+/***/
 
 def getFilesToDelete(folderId) {
+	// Trim hub version. useful for matching hub releases
+	// currVers = currVers.substring(0, currVers.lastIndexOf("."))
+
 	def retentionDate = new Date(now() - (1000 * 3600 * 24 * retentionDays)).format("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", TimeZone.getTimeZone("UTC"))
 	def uri = 'https://www.googleapis.com/drive/v3/files'
 	def headers = [ Authorization: "Bearer ${state.googleAccessToken}" ]
@@ -685,8 +683,8 @@ def deleteFilesBatch(idList, nextPage) {
 	builder << '--END_OF_PART--'
 	def body = builder.toString()
 	def params = [ uri: uri, headers: headers, body: body, requestContentType: requestContentType ]
-	log.info("Sending batched file delete request -- count: ${idList.size()}")
-	log.debug(body)
+	//log.info("Sending batched file delete request -- count: ${idList.size()}")
+	logDebug(body)
 	//asynchttpPost(handleDeleteFilesBatch, params, [device: device, params: params, nextPage: nextPage])
 }
 
