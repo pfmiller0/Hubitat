@@ -86,17 +86,12 @@ def mainPage() {
 def debugPage() {
 	dynamicPage(name:"debugPage", title: "Debug", install: false, uninstall: false) {
 		section {
-			paragraph "Debug buttons"
-		}
-		section {
-			input 'getToken', 'button', title: 'Log Access Token', submitOnChange: true
-		}
-		section {
-			input 'refreshToken', 'button', title: 'Force Token Refresh', submitOnChange: true
+			input 'btnRefreshToken', 'button', title: 'Force Token Refresh', submitOnChange: true
 		}
 		section("Test") {
-			input name: "btnRunBackup", type: "button", title: "Test backup"
-			input name: "btnRunCleanup", type: "button", title: "Test cleanup"
+			input 'btnDirTest', type: 'button', title: 'Test dir create'
+			input 'btnRunBackup', type: 'button', title: 'Test backup'
+			input 'btnRunCleanup', type: 'button', title: 'Test cleanup'
 		}
 	}
 }
@@ -295,10 +290,6 @@ def putResponse(resp, data) {
 	}
 }
 
-def logToken() {
-	log.debug("Access Token: ${state.googleAccessToken}")
-}
-
 String getDownloadFilename(resp) {
 	String contentDisposition = resp.getHeaders()["Content-Disposition"]
 	
@@ -473,6 +464,79 @@ def handleGetAppDataDrive(resp, data) {
 		logDebug "Drive URL for new file: ${respJson.webContentLink}"
 		//sendEvent(data.device, [name: 'image', value: '<img src="' + "${respJson.webContentLink}" + '" />', isStateChange: true])
 	}
+}
+
+String getDirId(String path) {
+	String dir
+	Integer i
+	
+	while (path.indexOf('/') == 0) path = path.drop(1)
+	i = path.indexOf('/')
+	if (i > 0) {
+		dir = path.substring(0, i)
+		log.debug dir
+		getDir(path.substring(i))
+	} else {
+		return path
+	}
+}
+
+void testGetDirId() {
+	//getDirId("/test/subdir/moredirs/dest")
+	log.debug "Folder id: ${createFolderSync("test dir")}"
+	createFolderSync("test_create_dir")
+}
+
+String createFolderSync(String name, String parent='root') {
+	String uri = 'https://www.googleapis.com/drive/v3/files'
+	String folderId
+	def headers = [ Authorization: "Bearer ${state.googleAccessToken}" ]
+	def contentType = 'application/json'
+	def body = [
+		mimeType: 'application/vnd.google-apps.folder',
+		parents: parent,
+		name: name
+	]
+	def params = [ uri: uri, headers: headers, contentType: contentType, body: body ]
+	log.info("Creating Google Drive folder")
+	try {
+		httpPost(params) { resp ->
+			def respCode = resp.getStatus()
+			if (resp.hasError()) {
+				def respError = ''
+				try {
+					respError = resp.getErrorData().replaceAll('[\n]', '').replaceAll('[ \t]+', ' ')
+				} catch (Exception ignored) {
+				//	no response body
+				}
+				if (respCode == 401 && !data.isRetry) {
+					log.warn('Authorization token expired, will refresh and retry.')
+					rescheduleLogin()
+					data.isRetry = true
+					asynchttpPost(handleCreateFolder, data.params, data)
+				//} else if (respCode == 429 && data.backoffCount < 5) {
+				//	log.warn("Hit rate limit, backoff and retry -- response: ${respError}")
+				//	data.backoffCount = (data.backoffCount ?: 0) + 1
+				//	runIn(10, handleBackoffRetryPost, [overwrite: false, data: [callback: handleDeviceGet, data: data]])
+				} else {
+					log.error("Create folder -- response code: ${respCode}, body: ${respError}")
+				}
+				folderId = null
+			} else {
+				def respJson = resp.getJson()
+				log.debug "folder id returned: ${respJson.id}"
+				folderId = (respJson.id)
+			}
+		}
+	} catch (SocketTimeoutException e) {
+		log.error("Connection to SeaWorld timed out.")
+		return null
+	} catch (e) {
+		log.error("There was an error: $e")
+		return null
+	}
+	
+	return folderId
 }
 
 def createFolder(String name, String parent='root') {
@@ -656,6 +720,12 @@ def handleDeleteFilesBatch(resp, data) {
 
 void appButtonHandler(String btn) {
 	switch (btn) {
+	case "btnRefreshToken":
+		refreshLogin()
+		break
+	case "btnDirTest":
+		testGetDirId()
+		break
 	case "btnRunBackup":
 		downloadLatestBackup()
 		break
