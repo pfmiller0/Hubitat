@@ -96,13 +96,24 @@ void unsetOfflineLabel() {
 Float averageTemp(Integer run = 1) {
 	Float total = 0
 	Float n = 0
-	
-	// Todo?: For n devices, get time of n+1th averageDev update back. Any device that hasn't been updated since then give less weight to.
-    // How does this handle unequally weighted devices?
+	Float weight
+	Float timeWeightAdjust
+	Float hrSinceLastUpdate
+	List a = [exp: 1.5, div: 15]
+
 	tempSensors.each {
 		if (it.getStatus() == "ACTIVE") { // Device goes INACTIVE after 24 hrs w/out events
-			total += it.currentTemperature * (settings["weight$it.id"] != null ? settings["weight$it.id"] : 1)
-			n += settings["weight$it.id"] != null ? settings["weight$it.id"] : 1
+			weight = settings["weight$it.id"] ?: 1
+			/****
+			hrSinceLastUpdate = (now() - it.currentState("temperature").date.time) / (1000 * 60 * 60)
+			timeWeightAdjust = hrSinceLastUpdate**a.exp / a.div + 1
+			/****/
+			timeWeightAdjust = timeWeightAdjust > 1.0 ? timeWeightAdjust : 1.0
+			if (timeWeightAdjust > 1.01) {
+				log.debug sprintf("%s: time: %.2f, weight: %.2f, adj: %.2f, adj weight: %.2f", it, hrSinceLastUpdate, weight, timeWeightAdjust, weight / timeWeightAdjust)
+			}
+			total += it.currentTemperature * weight / timeWeightAdjust
+			n += weight / timeWeightAdjust
 		}
 	}
 	
