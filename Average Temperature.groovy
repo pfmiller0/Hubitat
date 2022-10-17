@@ -1,12 +1,12 @@
 definition(
-    name: "Average Temperature",
-    namespace: "hyposphere.net",
+	name: "Average Temperature",
+	namespace: "hyposphere.net",
 	parent: "hyposphere.net:P's Average Temperatures",
-    author: "Bruce Ravenel",
-    description: "Average some temperature sensors",
-    category: "Convenience",
-    iconUrl: "",
-    iconX2Url: ""
+	author: "Bruce Ravenel",
+	description: "Average some temperature sensors",
+	category: "Convenience",
+	iconUrl: "",
+	iconX2Url: ""
 )
 
 preferences {
@@ -15,9 +15,11 @@ preferences {
 
 def mainPage() {
 	dynamicPage(name: "mainPage", title: " ", install: true, uninstall: true) {
+		def averageDev = getChildDevice("AverageTemp_${app.id}")
 		section {
 			input "thisName", "text", title: "Name this temperature averager", submitOnChange: true
-			if(thisName) app.updateLabel("$thisName")
+			if (thisName) app.updateLabel("$thisName")
+			if (averageDev) paragraph "Average device name: <b>${averageDev.label?:averageDev.name}</b>"
 			input "tempSensors", "capability.temperatureMeasurement", title: "Select Temperature Sensors", submitOnChange: true, required: true, multiple: true
 			paragraph "Sensor weights"
 			tempSensors.each {
@@ -28,10 +30,10 @@ def mainPage() {
 				}
 			}
 			input "useRun", "number", title: "Compute running average over this many sensor events:", defaultValue: 1, submitOnChange: true
-			if(tempSensors) paragraph "Current sensor average is ${averageTemp()}°"
-			if(useRun > 1) {
+			if (tempSensors) paragraph "Current sensor average is ${averageTemp()}°"
+			if (useRun > 1) {
 				initRun()
-				if(tempSensors) paragraph "Current running average is ${averageTemp(useRun)}°"
+				if (tempSensors) paragraph "Current running average is ${averageTemp(useRun)}°"
 			}
 		}
 	}
@@ -53,14 +55,15 @@ def uninstalled() {
 
 def initialize() {
 	def averageDev = getChildDevice("AverageTemp_${app.id}")
-	if(!averageDev) averageDev = addChildDevice("hubitat", "Virtual Temperature Sensor", "AverageTemp_${app.id}", null, [label: thisName, name: thisName])
-	averageDev.setTemperature(averageTemp())
+	if (!averageDev) averageDev = addChildDevice("hubitat", "Virtual Temperature Sensor", "AverageTemp_${app.id}", null, [label: thisName, name: thisName])
+	averageDev.updateSetting("txtEnable", [value:false,type:"bool"])
+	//averageDev.setTemperature(averageTemp())
 	subscribe(tempSensors, "temperature", 'handler')
 }
 
 def initRun() {
 	def temp = averageTemp()
-	if(!state.run) {
+	if (!state.run) {
 		state.run = []
 		for(int i = 0; i < useRun; i++) state.run += temp
 	}
@@ -77,7 +80,7 @@ void offlineCheck() {
 void setOfflineLabel() {
 	String label = app.getLabel()
 	
-	if ( label.substring(label.length()-2) != " ❌" ) {
+	if (label.substring(label.length()-2) != " ❌" ) {
 		app.updateLabel(label + " ❌")
 	}
 }
@@ -85,7 +88,7 @@ void setOfflineLabel() {
 void unsetOfflineLabel() {
 	String label = app.getLabel()
 	
-	if ( label.substring(label.length()-2) == " ❌" ) {
+	if (label.substring(label.length()-2) == " ❌" ) {
 		app.updateLabel(label.substring(0, label.length()-2))
 	}
 }
@@ -105,7 +108,7 @@ Float averageTemp(Integer run = 1) {
 	
 	if (n > 0) {		
 		def result = total / n
-		if(run > 1) {
+		if (run > 1) {
 			total = 0
 			state.run.each {total += it}
 			result = total / run
