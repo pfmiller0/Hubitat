@@ -99,7 +99,11 @@ Float averageTemp(Integer run = 1) {
 	Float weight
 	Float timeWeightAdjust
 	Float hrSinceLastUpdate
-	List a = [exp: 1.5, div: 15]
+	/****/
+	Map a = [exp: 1.5, div: 8.5]
+	/****
+	Map a = [exp: 1.5, div: 5]
+	/****/
 
 	tempSensors.each {
 		if (it.getStatus() == "ACTIVE") { // Device goes INACTIVE after 24 hrs w/out events
@@ -110,7 +114,7 @@ Float averageTemp(Integer run = 1) {
 			/****/
 			timeWeightAdjust = timeWeightAdjust > 1.0 ? timeWeightAdjust : 1.0
 			if (timeWeightAdjust > 1.01) {
-				log.debug sprintf("%s: time: %.2f, weight: %.2f, adj: %.2f, adj weight: %.2f", it, hrSinceLastUpdate, weight, timeWeightAdjust, weight / timeWeightAdjust)
+				log.debug sprintf("%s: time: %.2f, weight: %.2f, adj: %.2f, adj weight: %.2f (^%s/%s)", it, hrSinceLastUpdate, weight, timeWeightAdjust, weight / timeWeightAdjust, a.exp, a.div)
 			}
 			total += it.currentTemperature * weight / timeWeightAdjust
 			n += weight / timeWeightAdjust
