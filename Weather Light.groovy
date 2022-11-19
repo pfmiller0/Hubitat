@@ -20,15 +20,15 @@ preferences {
 	section() {
 		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
-	section("Devices") {
+	section("<b>Devices</b>") {
 		input "thermoOut", "capability.temperatureMeasurement", title: "Thermometer", required: true, multiple: false
-		input "myLights", "capability.colorControl", title: "Lights", required: true, multiple: true
+		input "lights", "capability.colorControl", title: "Lights", required: true, multiple: true
 	}
-	section("Settings") {
+	section("<b>Settings</b>") {
 		input "colorOption", "enum", title: "Color scale", options: ["Pete's", "Weather Channel", "Spectrum", "Spectrum 2", "Smartthings"]
 		input "saturationOption", "decimal", title: "Saturation (0..1) ", required: true, defaultValue: 0.95, range: "0..1"
 	}
-	section("Debug") {
+	section("<b>Debug</b>") {
 		input "debugMode", "bool", title: "Debug Mode", submitOnChange: true
 		if (debugMode) {
 			input "debugLevel", "enum", title: "Debug level", options: [0, 1, 2], required: true, defaultValue: 0
@@ -128,8 +128,8 @@ void updated() {
 
 void initialize() {
 	if (isPaused == false) {
-		subscribe(thermoOut, "temperature", updateLight)
-		subscribe(myLights, "switch.on", updateLight)
+		subscribe(thermoOut, "temperature", 'updateLight')
+		subscribe(lights, "switch.on", 'updateLight')
 
 		if (colorOption == "Pete's") {
 			if (debugMode) log.debug "Using Pete's colors"
@@ -172,7 +172,7 @@ void updateLight(evt) {
 			tempOut = thermoOut.latestValue("temperature")
 			if (debugMode) log.debug "temp: $tempOut"
 		} else {
-			tempOut = tempDebug ? tempDebug : thermoOut.latestValue("temperature")
+			tempOut = tempDebug ?: thermoOut.latestValue("temperature")
 			if (debugMode) log.debug "DEBUG temp: $tempOut"
 		}
 
@@ -181,7 +181,7 @@ void updateLight(evt) {
 		// Adjust saturation to configured level
 		hsvTempColor[1] = (hsvTempColor[1] * satLevel) as Integer
 
-		for (light in myLights) {
+		for (light in lights) {
 			if (light.latestValue("switch") == "on") {
 				if (debugMode) log.debug "Changing light $light"
 				light.setColor(["hue": hsvTempColor[0], "saturation": hsvTempColor[1], "level": light.latestValue("level")])
