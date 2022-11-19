@@ -128,8 +128,8 @@ void updated() {
 
 void initialize() {
 	if (isPaused == false) {
-		subscribe(thermoOut, "temperature", 'updateLight')
-		subscribe(lights, "switch.on", 'updateLight')
+		subscribe(thermoOut, 'temperature', 'updateLight')
+		subscribe(lights, 'switch', 'switchHandler')
 
 		if (colorOption == "Pete's") {
 			if (debugMode) log.debug "Using Pete's colors"
@@ -151,6 +151,15 @@ void initialize() {
 			state.tempScale = tempScalePetes()
 		}
 		updateLight()
+	}
+}
+
+void switchHandler(evt) {
+	if (lights.any {it.latestValue("switch") == "on"}) {
+		updateLight(evt)
+		subscribe(thermoOut, 'temperature', 'updateLight')
+	} else {
+		unsubscribe(thermoOut)
 	}
 }
 
