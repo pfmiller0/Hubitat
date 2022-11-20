@@ -5,8 +5,6 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 
-import groovy.transform.Field
-
 metadata {
 	definition (
 		name: "PurpleAir AQI Virtual Sensor",
@@ -44,8 +42,6 @@ metadata {
 	}
 }
 
-@Field Map RESPONSE_FIELDS = [:]
-
 // Parse events into attributes. Required for device drivers but not used
 def parse(String description) {
 	log.debug("IQAir: Parsing '${description}'")
@@ -67,9 +63,7 @@ def configure() {
 	unschedule()
 
 	//state.failCount = state.failCount ?: 0
-	
-	//log.debug "update_interval: ${update_interval}"
-	
+		
 	if ( update_interval == "1" ) {
 		schedule('0 */1 * ? * *', 'refresh')
 	} else if ( update_interval == "5" ) {
@@ -133,8 +127,6 @@ void sensorCheck() {
 		ignoreSSLIssues: true
 	]
 
-	if ( debugMode ) log.debug "params: $params"
-
 	try {
 		asynchttpGet('httpResponse', params, [coords: coords])
 	} catch (SocketTimeoutException e) {
@@ -145,9 +137,11 @@ void sensorCheck() {
 }
 
 void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
+	Map RESPONSE_FIELDS = [:]
 	Integer aqiValue = -1
 	String[][] sensorData
 	String sites
+	List<Map> sensors = []
 	
 	/*****************************/
 	if (resp.getStatus() != 200 ) {
@@ -178,9 +172,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		}
 	}
 	/*****************************/
-	
-	if ( debugMode ) log.debug "size: ${resp.getJson().data.size()}"
-	
+		
 	// Set field lookup map
 	resp.getJson().fields.eachWithIndex{it,index-> RESPONSE_FIELDS[(it)] = index}
 	
@@ -192,36 +184,49 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		sensorData = resp.getJson().data
 	}
 	
+	Float[] sensor_coords
+	sensorData.each {
+		sensor_coords = [Float.valueOf(it[RESPONSE_FIELDS['latitude']]), Float.valueOf(it[RESPONSE_FIELDS['longitude']])]
+		sensors << [
+			'site': it[RESPONSE_FIELDS['name']],
+			'part_count': Float.parseFloat(it[RESPONSE_FIELDS[avg_period]]),
+			'confidence': Integer.parseInt(it[RESPONSE_FIELDS['confidence']]),
+			'distance': distance(data.coords, sensor_coords),
+			'coords': sensor_coords
+		]
+	}
+		
 	if ( debugMode ) {
-		log.debug "resp: ${sensorData}"
-		log.debug "sites: ${sensorData.collect { it[RESPONSE_FIELDS["name"]] }}"
-		log.debug "AQIs: ${sensorData.collect { getPart2_5_AQI( Float.parseFloat(it[RESPONSE_FIELDS[avg_period]])) }}"
-		log.debug "confidence: ${sensorData.collect { it[RESPONSE_FIELDS["confidence"]] }}"
-		log.debug "unweighted av aqi: ${getPart2_5_AQI(sensorAverage(sensorData))}"
 		log.debug "coords: ${data.coords}"
+		log.debug "site: ${sensors.collect { it['site'] }}"
+		log.debug "part_count: ${sensors.collect { it['part_count'] }}"
+		log.debug "confidence: ${sensors.collect { it['confidence'] }}"
+		log.debug "AQIs: ${sensors.collect { getPart2_5_AQI(it['part_count']) }}"
+		log.debug "distance: ${sensors.collect { it['distance'] }}"
+		log.debug "unweighted av aqi: ${getPart2_5_AQI(sensorAverage(sensors, 'part_count'))}"
 		if ( weighted_avg && device_search ) {
-			log.debug "weighted av aqi: ${getPart2_5_AQI(sensorAverageWeighted(sensorData, data.coords))}"
+			log.debug "weighted av aqi: ${getPart2_5_AQI(sensorAverageWeighted(sensors, 'part_count', data.coords))}"
 		}
 	}
 	
 	if ( weighted_avg && device_search) {
-		aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensorData, data.coords))
+		aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensors, 'part_count', data.coords))
 	} else {
-		aqiValue = getPart2_5_AQI(sensorAverage(sensorData))
+		aqiValue = getPart2_5_AQI(sensorAverage(sensors, 'part_count'))
 	}
 	
 	AQIcategory = getCategory(aqiValue)
 	
-	sites = sensorData.collect { it[RESPONSE_FIELDS["name"]] }.sort()
-	//sites = sites.substring(1, sites.length() - 1) // Remove brackets around sites?
+	sites = sensors.collect { it['site'] }.sort()
+	//sites = sensorData.collect { it['site' }.sort().join(', ') // Remove brackets around sites?
 	
-	if ( sensorData.size() == 0 ) {
+	if ( sensors.size() == 0 ) {
 		log.error "No sensors found in search area"
 	} else {
-		if (sensorData.size() == 1) {
+		if (sensors.size() == 1) {
 			sendEvent(name: "sites", value: sites, descriptionText: "AQI reported from site ${sites}")
 		} else {
-			sendEvent(name: "sites", value: sites, descriptionText: "AQI is averaged from ${sensorData.size()} sites ${sites}")
+			sendEvent(name: "sites", value: sites, descriptionText: "AQI is averaged from ${sensors.size()} sites ${sites}")
 		}
 		sendEvent(name: "category", value: AQIcategory, descriptionText: "${device.displayName} category is ${AQIcategory}")
 		//sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${device.displayName} AQI level is ${aqiValue}")
@@ -229,18 +234,18 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	}
 }
 
-Float sensorAverage(String[][] sensors) {
+Float sensorAverage(List<Map> sensors, String field) {
 	Integer count = 0
 	Float sum = 0
     
 	sensors.each {
-		sum = sum + Float.valueOf(it[RESPONSE_FIELDS[avg_period]])
+		sum = sum + it[field]
 		count = count + 1
 	}
 	return sum / count
 }
 
-Float sensorAverageWeighted(String[][] sensors, Float[] coords) {
+Float sensorAverageWeighted(List<Map> sensors, String field, Float[] coords) {
 	Float count = 0.0
 	Float sum = 0.0
 	ArrayList distances = []
@@ -248,12 +253,12 @@ Float sensorAverageWeighted(String[][] sensors, Float[] coords) {
 	
 	// Weighted average. First find nearest sensor. Then divide sensors distances by nearest distance to get weights.
 	sensors.each {
-		distances.add(distance(coords, [Float.valueOf(it[RESPONSE_FIELDS["latitude"]]), Float.valueOf(it[RESPONSE_FIELDS["longitude"]])]))
+		distances.add(it['distance'])
 	}
 	nearest = distances.min()
 	
 	sensors.eachWithIndex { it, i ->
-	   	Float val = Float.valueOf(it[RESPONSE_FIELDS[avg_period]])
+	   	Float val = it[field]
 	   	Float weight = nearest / distances[i]
 		sum = sum + val * weight
 	   	count = count + weight
@@ -312,7 +317,7 @@ String getCategory(Integer AQI) {
 	}
 }
 
-Double distance(Float[] coorda, List<Float> coordb) {
+Float distance(Float[] coorda, Float[] coordb) {
 	// Haversine function from http://www.movable-type.co.uk/scripts/latlong.html
 	Double R = 6371000; // metres
 	Double φ1 = Math.toRadians(coorda[0]); // φ, λ in radians
