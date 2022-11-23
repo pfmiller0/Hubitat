@@ -1,0 +1,192 @@
+/**
+ *  Strava Activity Notifier
+ *	Notify when Strava Activity is posted
+ * 
+ *  Copyright 2022 Peter Miller
+ *
+ *  Based on code from Google SDM Api 0.6.0 by David Kilgore
+ *  https://github.com/dkilgore90/google-sdm-api
+ *  Copyright 2020 David Kilgore. All Rights Reserved
+ *
+ *  This software is free for Private Use. You may use and modify the software without distributing it.
+ *  If you make a fork, and add new code, then you should create a pull request to add value, there is no
+ *  guarantee that your pull request will be merged.
+ *
+ *  You may not grant a sublicense to modify and distribute this software to third parties without permission
+ *  from the copyright holder
+ *  Software is provided without warranty and your use of it is at your own risk.
+ *
+ */
+
+
+//String appVersion() { return "1.5" }
+
+definition(
+	name: "Strava Activity Notifier",
+	namespace: "hyposphere.net",
+	author: "Peter Miller",
+	description: "Notify when Strava Activity is posted",
+	iconUrl: "",
+	iconX2Url: "",
+	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Strava%20Activity%20Notifier.groovy"
+)
+
+preferences {
+	page(name: "mainPage")
+}
+
+def mainPage() {
+	dynamicPage(name: "mainPage", title: " ", install: true, uninstall: true) {
+		section() {
+			input "isPaused", "bool", title: "Pause app", defaultValue: false
+		}
+		if (state.StravaUser) {
+			section("<b>Strava user ${state.StravaUser.firstname} ${state.StravaUser.lastname} logged in</b>") {}
+		}
+		section('<b>Connection settings</b> (from <a target="_blank" href="https://www.strava.com/settings/api">Strava</a>)') {
+			input 'client_id', 'string', title: 'Strava API client_id'
+			input 'client_secret', 'string', title: 'Strava API client_secret'
+		}
+		getAuthLink()
+	}
+}
+
+def initialize(evt) {
+	if (isPaused == false) {
+		rescheduleLogin()
+	} else {
+		addAppLabel("Paused", "red")
+	}
+}
+
+def updated() {
+	if (isPaused == false) {
+		rescheduleLogin()
+		subscribe(location, 'systemStart', 'initialize')
+	} else {
+		unschedule()
+		unsubscribe()
+	}
+}
+
+def installed() {
+	createAccessToken()
+	subscribe(location, 'systemStart', 'initialize')
+}
+
+def uninstalled() {
+	unschedule()
+	unsubscribe()
+}
+
+mappings {
+	path("/handleAuth") {
+		action: [
+			GET: "handleAuthRedirect"
+		]
+	}
+}
+
+void getAuthLink() {
+	if (client_id && state?.accessToken) {
+		section {
+			href(
+				name	: 'authHref',
+				title	  : 'Auth Link',
+				url		: buildAuthUrl(),
+				description: 'Click this link to authorize with your Strava account'
+			)
+		}
+	} else {
+		section {
+			paragraph "Authorization link is hidden until the required credentials.json inputs are provided, and App installation is saved by clicking 'Done'"
+		} 
+	}
+}
+
+String buildAuthUrl() {
+	String url = 'http://www.strava.com/oauth/authorize?' +
+			'client_id=' + client_id +
+			'&response_type=code&' +
+			'redirect_uri=https://cloud.hubitat.com/oauth/stateredirect' +
+			'&state=' + getHubUID() + '/apps/' + app.id + '/handleAuth?access_token=' + state.accessToken +
+			'&approval_prompt=force&scope=read'
+	return url
+}
+
+def handleAuthRedirect() {
+	log.info('successful redirect from Strava')
+	String authCode = params.code
+	login(authCode)
+	runEvery3Hours('refreshLogin')
+	StringBuilder builder = new StringBuilder()
+	builder << "<!DOCTYPE html><html><head><title>Hubitat Elevation - Strava</title></head>"
+	builder << "<body><p>Congratulations! Strava has authenticated successfully</p>"
+	builder << "<p><a href=https://${location.hub.localIP}/installedapp/configure/${app.id}/mainPage>Click here</a> to return to the App main page.</p></body></html>"
+	
+	String html = builder.toString()
+
+	render contentType: "text/html", data: html, status: 200
+}
+
+void rescheduleLogin() {
+	unschedule('refreshLogin')
+	if (state?.StravaRefreshToken) {
+		refreshLogin()
+		runEvery3Hours('refreshLogin')
+	}
+}
+
+void login(String authCode) {
+	String uri = 'https://www.strava.com/oauth/token'
+	Map query = [
+					client_id:		client_id,
+					client_secret:	client_secret,
+					code:			authCode,
+					grant_type:		'authorization_code',
+					redirect_uri:	'https://cloud.hubitat.com/oauth/stateredirect'
+				]
+	Map params = [uri: uri, query: query]
+
+	log.info('Getting access_token from Strava')
+
+	try {
+		httpPost(params) { response -> handleLoginResponse(response) }
+	} catch (groovyx.net.http.HttpResponseException e) {
+		log.error("Login failed -- ${e.getLocalizedMessage()}: ${e.response.data}")
+	}
+}
+
+void refreshLogin() {
+	String uri = 'https://www.strava.com/oauth/token'
+	Map query = [
+					client_id:		client_id,
+					client_secret:	client_secret,
+					refresh_token:	state.StravaRefreshToken,
+					grant_type:		'refresh_token',
+				]
+	Map params = [uri: uri, query: query]
+
+	log.debug('Refreshing access_token from Strava')
+
+	try {
+		httpPost(params) { response -> handleLoginResponse(response) }
+	} catch (groovyx.net.http.HttpResponseException e) {
+		log.error("Login refresh failed -- ${e.getLocalizedMessage()}: ${e.response.data}")
+	}
+}
+
+void handleLoginResponse(resp) {
+	String respCode = resp.getStatus()
+	Map respJson = resp.getData()
+	
+	//log.debug("response: ${respJson}")
+	log.info("Strava athlete authenticated: ${respJson.athlete.firstname} ${respJson.athlete.lastname}")
+	
+	state.StravaUser = respJson.athlete
+	
+	if (respJson.refresh_token) {
+		state.StravaRefreshToken = respJson.refresh_token
+	}
+	state.StravaAccessToken = respJson.access_token
+}
