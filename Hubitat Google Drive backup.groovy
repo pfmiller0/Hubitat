@@ -68,10 +68,10 @@ def mainPage() {
 		}
 		
 		section() {
-			input 'credsJson', 'text', title: 'Google credentials.json', required: true, submitOnChange: false
 			input 'backupTime', 'time', title: 'Backup at this time:', required: true, defaultValue: '08:45 AM'
 			input 'retentionDays', 'number', title: 'Retention days', required: true, defaultValue: 14, submitOnChange: false
 			input 'backupTrigger', 'capability.switch', title: 'Backup trigger switch', multiple: false
+			input 'credsJson', 'text', title: 'Google credentials.json', required: true, submitOnChange: false
 		}
 		getAuthLink()
 
@@ -84,13 +84,13 @@ def mainPage() {
 
 def debugPage() {
 	dynamicPage(name:"debugPage", title: "Debug", install: false, uninstall: false) {
-		section {
+		section() {
 			input 'btnRefreshToken', 'button', title: 'Force Token Refresh', submitOnChange: true
 		}
 		section("Test") {
-			input 'btnDirTest', type: 'button', title: 'Test dir create'
-			input 'btnRunBackup', type: 'button', title: 'Test backup'
-			input 'btnRunCleanup', type: 'button', title: 'Test cleanup'
+			input 'btnDirTest', 'button', title: 'Test dir create'
+			input 'btnRunBackup', 'button', title: 'Test backup'
+			input 'btnRunCleanup', 'button', title: 'Test cleanup'
 		}
 	}
 }
@@ -168,8 +168,6 @@ def mainPageLink() {
 }
 
 def updated() {
-		unschedule()
-		unsubscribe()
 	if (isPaused == false) {
 		rescheduleLogin()
 		//runEvery10Minutes('checkGoogle')
@@ -184,7 +182,6 @@ def updated() {
 }
 
 def installed() {
-	//initialize()
 	createAccessToken()
 	//runEvery10Minutes checkGoogle
 	//schedule('0 0 23 ? * *', 'driveRetentionJob')
@@ -213,11 +210,11 @@ def login(String authCode) {
 	def creds = getCredentials()
 	def uri = 'https://www.googleapis.com/oauth2/v4/token'
 	def query = [
-					client_id	: creds.client_id,
-					client_secret: creds.client_secret,
-					code		 : authCode,
-					grant_type   : 'authorization_code',
-					redirect_uri : 'https://cloud.hubitat.com/oauth/stateredirect'
+					client_id:		creds.client_id,
+					client_secret:	creds.client_secret,
+					code:			authCode,
+					grant_type:		'authorization_code',
+					redirect_uri:	'https://cloud.hubitat.com/oauth/stateredirect'
 				]
 	def params = [uri: uri, query: query]
 	try {
@@ -232,10 +229,10 @@ def refreshLogin() {
 	def creds = getCredentials()
 	def uri = 'https://www.googleapis.com/oauth2/v4/token'
 	def query = [
-					client_id	: creds.client_id,
-					client_secret: creds.client_secret,
-					refresh_token: state.googleRefreshToken,
-					grant_type   : 'refresh_token',
+					client_id:		creds.client_id,
+					client_secret:	creds.client_secret,
+					refresh_token:	state.googleRefreshToken,
+					grant_type:		'refresh_token',
 				]
 	def params = [uri: uri, query: query]
 	try {
@@ -301,10 +298,10 @@ def driveRetentionJob() {
 	getFilesToDelete(state.folderId)
 }
 
-void downloadLatestBackup() {
+void downloadLatestBackup(evt=null) {
 	String uri = 'http://' + location.hub.localIP + ':8080/hub/backupDB?fileName=latest'
 	//String uri = 'http://' + location.hub.localIP + ':8080/local/backup_test.file'
-	
+
 	Map params = [
 		uri: uri,
 		requestContentType: 'application/octet-stream',
@@ -315,7 +312,7 @@ void downloadLatestBackup() {
 
 	try {
 		asynchttpGet('handleDownloadLatestBackup', params, [data: null])
-	} catch (e) {
+	} catch (Exception e) {
 		logDebug "There was an error: $e"	
 	}
 }
@@ -346,9 +343,9 @@ void createFile(file, name) {
 	def contentType = 'application/json'
 	def ts = now()
 	def body = [
-		mimeType: 'application/octet-stream',
-		name: name,
-		parents: [ state.folderId ]
+		mimeType:	'application/octet-stream',
+		name:		name,
+		parents:	[ state.folderId ]
 	]
 	def params = [ uri: uri, headers: headers, contentType: contentType, body: body ]
 	logDebug("Creating Google Drive file for backup")
@@ -420,7 +417,7 @@ def handleUploadDrive(resp, data) {
 		}
 	} else {
 		log.info("Backup file uploaded successfully")
-		logDebug("Getting file info for new file")
+		log.debug("Getting file info for new file")
 		getAppDataDrive(data.fileId)
 	}
 }
@@ -429,9 +426,9 @@ def getAppDataDrive(fileId) {
 	def uri = "https://www.googleapis.com/drive/v3/files/${fileId}"
 	def headers = [ Authorization: 'Bearer ' + state.googleAccessToken ]
 	def contentType = 'application/json'
-	def query = [ fields: 'webContentLink']
+	def query = [ fields: 'webContentLink,webViewLink']
 	def params = [ uri: uri, headers: headers, contentType: contentType, query: query ]
-	logDebug("Retrieving file by id to get file url")
+	log.debug("Retrieving file by id to get file url")
 	asynchttpGet(handleGetAppDataDrive, params, [params: params])
 }
 
@@ -454,7 +451,8 @@ def handleGetAppDataDrive(resp, data) {
 		}
 	} else {
 		def respJson = resp.getJson()
-		logDebug "Drive URL for new file: ${respJson.webContentLink}"
+		logDebug "Download URL for new file: ${respJson.webContentLink}"
+		logDebug "Drive URL for new file: ${respJson.webViewLink}"
 		//sendEvent(data.device, [name: 'image', value: '<img src="' + "${respJson.webContentLink}" + '" />', isStateChange: true])
 	}
 }
@@ -476,7 +474,7 @@ String getDirId(String path) {
 
 void testGetDirId() {
 	//getDirId("/test/subdir/moredirs/dest")
-	log.debug "Folder id: ${createFolderSync("test dir")}"
+	logDebug "Folder id: ${createFolderSync("test dir")}"
 	createFolderSync("test_create_dir")
 }
 
@@ -487,7 +485,7 @@ String createFolderSync(String name, String parent='root') {
 	def contentType = 'application/json'
 	def body = [
 		mimeType: 'application/vnd.google-apps.folder',
-		parents: parent,
+		parents: [ parent ],
 		name: name
 	]
 	def params = [ uri: uri, headers: headers, contentType: contentType, body: body ]
@@ -524,7 +522,7 @@ String createFolderSync(String name, String parent='root') {
 	} catch (SocketTimeoutException e) {
 		log.error("Connection to SeaWorld timed out.")
 		return null
-	} catch (e) {
+	} catch (Exception e) {
 		log.error("There was an error: $e")
 		return null
 	}
@@ -538,7 +536,7 @@ def createFolder(String name, String parent='root') {
 	def contentType = 'application/json'
 	def body = [
 		mimeType: 'application/vnd.google-apps.folder',
-		parents: parent,
+		parents: [ parent ],
 		name: name
 	]
 	def params = [ uri: uri, headers: headers, contentType: contentType, body: body ]
@@ -570,7 +568,7 @@ def handleCreateFolder(resp, data) {
 		return null
 	} else {
 		def respJson = resp.getJson()
-		log.debug "folder id returned: ${respJson.id}"
+		logDebug "folder id returned: ${respJson.id}"
 		state.folderId = (respJson.id)
 	}
 }
@@ -625,7 +623,7 @@ def getFilesToDelete(folderId) {
 	def contentType = 'application/json'
 	def query = [ q: "modifiedTime < '${retentionDate}' and '${folderId}' in parents" ]
 	def params = [ uri: uri, headers: headers, contentType: contentType, query: query ]
-	log.info("Retrieving files to delete based on retentionDays: ${retentionDays}")
+	log.info("Finding files older than ${retentionDays} days")
 	logDebug(params)
 	asynchttpGet(handleGetFilesToDelete, params, [params: params])
 }
@@ -656,7 +654,7 @@ def handleGetFilesToDelete(resp, data) {
 		def nextPage = respJson.nextPageToken ? true : false
 		def idList = []
 		respJson.files.each {
-			log.debug "File to delete: ${it.name}"
+			log.info "File to delete: ${it.name}"
 			idList.add(it.id)
 		}
 		if (idList) {
@@ -683,9 +681,9 @@ def deleteFilesBatch(idList, nextPage) {
 	builder << '--END_OF_PART--'
 	def body = builder.toString()
 	def params = [ uri: uri, headers: headers, body: body, requestContentType: requestContentType ]
-	//log.info("Sending batched file delete request -- count: ${idList.size()}")
+	log.info("Sending batched file delete request -- count: ${idList.size()}")
 	logDebug(body)
-	//asynchttpPost(handleDeleteFilesBatch, params, [device: device, params: params, nextPage: nextPage])
+	asynchttpPost(handleDeleteFilesBatch, params, [device: device, params: params, nextPage: nextPage])
 }
 
 def handleDeleteFilesBatch(resp, data) {
