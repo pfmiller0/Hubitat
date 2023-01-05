@@ -22,13 +22,13 @@
 //String appVersion() { return "1.5" }
 
 definition(
-	name: "Strava Activity Notifier",
+	name: "Strava Activity Device",
 	namespace: "hyposphere.net",
 	author: "Peter Miller",
-	description: "Notify when Strava Activity is posted",
+	description: "Create a virtual device for Strava Activity information",
 	iconUrl: "",
 	iconX2Url: "",
-	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Strava%20Activity%20Notifier.groovy"
+	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Strava%20Activity%20Device.groovy"
 )
 
 preferences {
