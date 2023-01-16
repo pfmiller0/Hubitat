@@ -38,7 +38,7 @@ metadata {
 			input "Read_Key", "text", title: "Private key", required: false, description: "Required to access private devices"
 			input "sensor_index", "number", title: "Sensor index", required: true, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com", defaultValue: 90905
 		}
-		input "debugMode", "bool", title: "Debug logging", required: true, defaultValue: false
+		input "logEnable", "bool", title: "Enable debug logging", required: true, defaultValue: false
 	}
 }
 
@@ -196,7 +196,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		]
 	}
 		
-	if ( debugMode ) {
+	if ( logEnable ) {
 		log.debug "coords: ${data.coords}"
 		log.debug "site: ${sensors.collect { it['site'] }}"
 		log.debug "part_count: ${sensors.collect { it['part_count'] }}"
