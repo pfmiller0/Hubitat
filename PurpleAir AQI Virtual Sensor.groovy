@@ -3,6 +3,21 @@
  *
  *  PurpleAir sensor map: https://map.purpleair.com/
  *  API documentation: https://api.purpleair.com/ 
+ *  Change History:
+ *
+ *    Date        Who            What
+ *    ----        ---            ----
+ * Unknown	pfmiller0	Original release
+ * 2023-01-16	ucdscott	Changed debug logging to de facto standard logEnable. Added revision history.
+ *
+ *
+ *
+ *
+ *
+ */
+ 
+ 
+ 
  */
 
 metadata {
