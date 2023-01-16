@@ -49,7 +49,7 @@ metadata {
 			input "Read_Key", "text", title: "Private key", required: false, description: "Required to access private devices"
 			input "sensor_index", "number", title: "Sensor index", required: true, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com", defaultValue: 90905
 		}
-		input "logEnable", "bool", title: "Enable debug logging", required: true, defaultValue: false
+		input "logEnable", "bool", title: "Enable debug logging", defaultValue: false
 	}
 }
 
