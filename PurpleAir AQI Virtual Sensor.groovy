@@ -5,6 +5,8 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 
+public static String version() { return "1.1.0" }
+
 metadata {
 	definition (
 		name: "PurpleAir AQI Virtual Sensor",
@@ -131,7 +133,7 @@ void sensorCheck() {
 		asynchttpGet('httpResponse', params, [coords: coords])
 	} catch (SocketTimeoutException e) {
 		log.error("Connection to PurpleAir timed out.")
-	} catch (e) {
+	} catch (Exception e) {
 		log.error("There was an error: $e")
 	}
 }
@@ -183,7 +185,8 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	} else {
 		sensorData = resp.getJson().data
 	}
-	
+
+	// initialize sensor maps
 	Float[] sensor_coords
 	sensorData.each {
 		sensor_coords = [Float.valueOf(it[RESPONSE_FIELDS['latitude']]), Float.valueOf(it[RESPONSE_FIELDS['longitude']])]
@@ -195,7 +198,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 			'coords': sensor_coords
 		]
 	}
-		
+
 	if ( debugMode ) {
 		log.debug "coords: ${data.coords}"
 		log.debug "site: ${sensors.collect { it['site'] }}"
@@ -208,7 +211,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 			log.debug "weighted av aqi: ${getPart2_5_AQI(sensorAverageWeighted(sensors, 'part_count', data.coords))}"
 		}
 	}
-	
+
 	if ( weighted_avg && device_search) {
 		aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensors, 'part_count', data.coords))
 	} else {
