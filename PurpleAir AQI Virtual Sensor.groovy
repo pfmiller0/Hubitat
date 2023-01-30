@@ -5,7 +5,7 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 
-public static String version() { return "1.1.0" }
+public static String version() { return "1.1.1" }
 
 metadata {
 	definition (
@@ -190,13 +190,23 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	Float[] sensor_coords
 	sensorData.each {
 		sensor_coords = [Float.valueOf(it[RESPONSE_FIELDS['latitude']]), Float.valueOf(it[RESPONSE_FIELDS['longitude']])]
-		sensors << [
-			'site': it[RESPONSE_FIELDS['name']],
-			'part_count': Float.parseFloat(it[RESPONSE_FIELDS[avg_period]]),
-			'confidence': Integer.parseInt(it[RESPONSE_FIELDS['confidence']]),
-			'distance': distance(data.coords, sensor_coords),
-			'coords': sensor_coords
-		]
+		if ( device_search ) {
+			sensors << [
+				'site': it[RESPONSE_FIELDS['name']],
+				'part_count': Float.parseFloat(it[RESPONSE_FIELDS[avg_period]]),
+				'confidence': Integer.parseInt(it[RESPONSE_FIELDS['confidence']]),
+				'distance': distance(data.coords, sensor_coords),
+				'coords': sensor_coords
+			]
+		} else {
+			sensors << [
+				'site': it[RESPONSE_FIELDS['name']],
+				'part_count': Float.parseFloat(it[RESPONSE_FIELDS[avg_period]]),
+				'confidence': Integer.parseInt(it[RESPONSE_FIELDS['confidence']]),
+				'distance': 0,
+				'coords': sensor_coords
+			]
+		}
 	}
 
 	if ( debugMode ) {
