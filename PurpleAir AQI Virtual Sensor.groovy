@@ -5,7 +5,7 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 
-public static String version() { return "1.1.1" }
+public static String version() { return "1.1.2" }
 
 metadata {
 	definition (
@@ -190,23 +190,13 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	Float[] sensor_coords
 	sensorData.each {
 		sensor_coords = [Float.valueOf(it[RESPONSE_FIELDS['latitude']]), Float.valueOf(it[RESPONSE_FIELDS['longitude']])]
-		if ( device_search ) {
-			sensors << [
-				'site': it[RESPONSE_FIELDS['name']],
-				'part_count': Float.parseFloat(it[RESPONSE_FIELDS[avg_period]]),
-				'confidence': Integer.parseInt(it[RESPONSE_FIELDS['confidence']]),
-				'distance': distance(data.coords, sensor_coords),
-				'coords': sensor_coords
-			]
-		} else {
-			sensors << [
-				'site': it[RESPONSE_FIELDS['name']],
-				'part_count': Float.parseFloat(it[RESPONSE_FIELDS[avg_period]]),
-				'confidence': Integer.parseInt(it[RESPONSE_FIELDS['confidence']]),
-				'distance': 0,
-				'coords': sensor_coords
-			]
-		}
+		sensors << [
+			'site': it[RESPONSE_FIELDS['name']],
+			'part_count': Float.parseFloat(it[RESPONSE_FIELDS[avg_period]]),
+			'confidence': Integer.parseInt(it[RESPONSE_FIELDS['confidence']]),
+			'distance': distance(data.coords, sensor_coords),
+			'coords': sensor_coords
+		]
 	}
 
 	if ( debugMode ) {
@@ -331,6 +321,7 @@ String getCategory(Integer AQI) {
 }
 
 Float distance(Float[] coorda, Float[] coordb) {
+	if ( coorda == null || coordb == null ) return 0.0
 	// Haversine function from http://www.movable-type.co.uk/scripts/latlong.html
 	Double R = 6371000; // metres
 	Double φ1 = Math.toRadians(coorda[0]); // φ, λ in radians
