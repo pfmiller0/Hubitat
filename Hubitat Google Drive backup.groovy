@@ -56,7 +56,7 @@ mappings {
 }
 
 private logDebug(msg) {
-	if (settings?.debugOutput) {
+	if (debugMode) {
 		log.debug "$msg"
 	}
 }
@@ -76,7 +76,7 @@ def mainPage() {
 		getAuthLink()
 
 		section() {
-			input 'debugOutput', 'bool', title: 'Enable Debug Logging?', defaultValue: false, submitOnChange: true
+			input 'debugMode', 'bool', title: 'Enable Debug Logging?', defaultValue: false, submitOnChange: true
 		}		
 		getDebugLink()
 	}
@@ -88,9 +88,9 @@ def debugPage() {
 			input 'btnRefreshToken', 'button', title: 'Force Token Refresh', submitOnChange: true
 		}
 		section("Test") {
-			input 'btnDirTest', 'button', title: 'Test dir create'
-			input 'btnRunBackup', 'button', title: 'Test backup'
-			input 'btnRunCleanup', 'button', title: 'Test cleanup'
+			input 'btnDirTest', 'button', title: 'Run dir create'
+			input 'btnRunBackup', 'button', title: 'Run backup'
+			input 'btnRunCleanup', 'button', title: 'Run cleanup'
 		}
 	}
 }
@@ -113,8 +113,9 @@ def getAuthLink() {
 }
 
 def buildAuthUrl() {
-	def creds = getCredentials()	
-	url = 'https://accounts.google.com/o/oauth2/v2/auth?' + 
+	def creds = getCredentials()
+	
+	String url = 'https://accounts.google.com/o/oauth2/v2/auth?' + 
 			'redirect_uri=https://cloud.hubitat.com/oauth/stateredirect' +
 			'&state=' + getHubUID() + '/apps/' + app.id + '/handleAuth?access_token=' + state.accessToken +
 			'&access_type=offline&prompt=consent&client_id=' + creds?.client_id + 
@@ -147,13 +148,10 @@ def handleAuthRedirect() {
 	def authCode = params.code
 	login(authCode)
 	runEvery1Hour('refreshLogin')
-	def builder = new StringBuilder()
-	builder << "<!DOCTYPE html><html><head><title>Hubitat Elevation - Google Drive</title></head>"
-	builder << "<body><p>Congratulations! Google Drive has authenticated successfully</p>"
-	builder << "<p><a href=https://${location.hub.localIP}/installedapp/configure/${app.id}/mainPage>Click here</a> to return to the App main page.</p></body></html>"
+	String html = "<!DOCTYPE html><html><head><title>Hubitat Elevation - Google Drive</title></head>" +
+					"<body><p>Congratulations! Google Drive has authenticated successfully</p>" +
+					"<p><a href=https://${location.hub.localIP}/installedapp/configure/${app.id}/mainPage>Click here</a> to return to the App main page.</p></body></html>"
 	
-	def html = builder.toString()
-
 	render contentType: "text/html", data: html, status: 200
 }
 
@@ -170,7 +168,6 @@ def mainPageLink() {
 def updated() {
 	if (isPaused == false) {
 		rescheduleLogin()
-		//runEvery10Minutes('checkGoogle')
 		schedule(backupTime, 'downloadLatestBackup')
 		schedule('0 15 9 ? * *', 'driveRetentionJob')
 		subscribe(backupTrigger, 'switch.on', 'downloadLatestBackup')
@@ -183,8 +180,6 @@ def updated() {
 
 def installed() {
 	createAccessToken()
-	//runEvery10Minutes checkGoogle
-	//schedule('0 0 23 ? * *', 'driveRetentionJob')
 	subscribe(location, 'systemStart', 'initialize')
 }
 
@@ -294,7 +289,7 @@ String getDownloadFilename(resp) {
 }
 
 def driveRetentionJob() {
-	log.info('Running Google Drive retention cleanup job')
+	//log.info('Running Google Drive retention cleanup job')
 	getFilesToDelete(state.folderId)
 }
 
@@ -306,14 +301,16 @@ void downloadLatestBackup(evt=null) {
 		uri: uri,
 		requestContentType: 'application/octet-stream',
 		contentType: 'application/octet-stream',
-		timeout: 30,
+		timeout: 60,
 		ignoreSSLIssues: true
 	]
 
 	try {
 		asynchttpGet('handleDownloadLatestBackup', params, [data: null])
+	} catch (groovyx.net.http.HttpResponseException e) {
+		log.error("Error downloading latest backup: ${e.getLocalizedMessage()} (${e.response.data})")
 	} catch (Exception e) {
-		logDebug "There was an error: $e"	
+		log.error "Error downloading latest backup: $e"	
 	}
 }
 
@@ -321,15 +318,19 @@ void handleDownloadLatestBackup(hubitat.scheduling.AsyncResponse resp, Map data)
 	String name = ""
 	
 	if (resp.getStatus() != 200 ) {
-		log.debug "HTTP error: " + resp.getStatus()
+		if (resp.getStatus() == 408 ) {
+			log.error "HTTP error downloading backup: timeout ${resp.getStatus()})"
+		} else {
+			log.error "HTTP error downloading backup: ${resp.getStatus()}"
+		}
 		return
 	}
 	
 	name = getDownloadFilename(resp)
 	logDebug "Downloaded file (name: ${name})"
 	/***
-	log.debug "HTTP download data (raw): " + resp.getData()
-	log.debug "HTTP download data (decoded): " + resp.decodeBase64()
+	logDebug "HTTP download data (raw): " + resp.getData()
+	logDebug "HTTP download data (decoded): " + resp.decodeBase64()
 	/***/
 	backupFile = resp.getData()
 	
@@ -417,7 +418,7 @@ def handleUploadDrive(resp, data) {
 		}
 	} else {
 		log.info("Backup file uploaded successfully")
-		log.debug("Getting file info for new file")
+		logDebug("Getting file info for new file")
 		getAppDataDrive(data.fileId)
 	}
 }
@@ -428,7 +429,7 @@ def getAppDataDrive(fileId) {
 	def contentType = 'application/json'
 	def query = [ fields: 'webContentLink,webViewLink']
 	def params = [ uri: uri, headers: headers, contentType: contentType, query: query ]
-	log.debug("Retrieving file by id to get file url")
+	logDebug("Retrieving file by id to get file url")
 	asynchttpGet(handleGetAppDataDrive, params, [params: params])
 }
 
@@ -465,7 +466,7 @@ String getDirId(String path) {
 	i = path.indexOf('/')
 	if (i > 0) {
 		dir = path.substring(0, i)
-		log.debug dir
+		logDebug dir
 		getDir(path.substring(i))
 	} else {
 		return path
@@ -515,7 +516,7 @@ String createFolderSync(String name, String parent='root') {
 				folderId = null
 			} else {
 				def respJson = resp.getJson()
-				log.debug "folder id returned: ${respJson.id}"
+				logDebug "folder id returned: ${respJson.id}"
 				folderId = (respJson.id)
 			}
 		}
@@ -649,6 +650,7 @@ def handleGetFilesToDelete(resp, data) {
 		} else {
 			log.error("Files to delete retrieval -- response code: ${respCode}, body: ${respError}")
 		}
+
 	} else {
 		def respJson = resp.getJson()
 		def nextPage = respJson.nextPageToken ? true : false
@@ -666,20 +668,19 @@ def handleGetFilesToDelete(resp, data) {
 }
 
 def deleteFilesBatch(idList, nextPage) {
-	def uri = 'https://www.googleapis.com/batch/drive/v3'
+	String uri = 'https://www.googleapis.com/batch/drive/v3'
 	def headers = [
 		Authorization: "Bearer ${state.googleAccessToken}",
 		'Content-Type': 'multipart/mixed; boundary=END_OF_PART'
 	]
-	def requestContentType = 'text/plain'
-	def builder = new StringBuilder()
+	String requestContentType = 'text/plain'
+	String body = ""
 	idList.each {
-		builder << '--END_OF_PART\r\n'
-		builder << 'Content-type: application/http\r\n\r\n'
-		builder << "DELETE https://www.googleapis.com/drive/v3/files/${it}\r\n\r\n"
+		body += '--END_OF_PART\r\n' +
+				'Content-type: application/http\r\n\r\n' +
+				"DELETE https://www.googleapis.com/drive/v3/files/${it}\r\n\r\n"
 	}
-	builder << '--END_OF_PART--'
-	def body = builder.toString()
+	body += '--END_OF_PART--'
 	def params = [ uri: uri, headers: headers, body: body, requestContentType: requestContentType ]
 	log.info("Sending batched file delete request -- count: ${idList.size()}")
 	logDebug(body)
