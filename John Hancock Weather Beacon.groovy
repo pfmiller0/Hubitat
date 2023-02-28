@@ -90,7 +90,7 @@ void updateLight(evt) {
 	} 
 
 	if (weather.getStatus() != "ACTIVE") {
-		log.warn "Temp sensor is not online, do nothing"	
+		log.warn "Weather device is not updating, do nothing"	
 	} else {
 		hsvColor = getColor()
 		light.setColor(["hue": hsvColor[0], "saturation": hsvColor[1], "level": light.latestValue("level")])
