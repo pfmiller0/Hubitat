@@ -7,15 +7,15 @@
 #include hyposphere.net.plib
 
 definition(
-    name: "Device monitor",
-    namespace: "hyposphere.net",
+	name: "Device monitor",
+	namespace: "hyposphere.net",
 	parent: "hyposphere.net:P's Utilities",
-    author: "Peter Miller",
-    description: "Monitor battery devices",
-    category: "My Apps",
-    iconUrl: "",
-    iconX2Url: "",
-    importUrl: ""
+	author: "Peter Miller",
+	description: "Monitor battery devices",
+	category: "My Apps",
+	iconUrl: "",
+	iconX2Url: "",
+	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Device%20monitor.groovy"
 )
 
 preferences {
@@ -59,7 +59,7 @@ def uninstalled() {
 
 void deviceCheckStart() {
 	batteryDevices.each {
-		it.refresh()
+		if (it.hasCommand('refresh')) it.refresh()
 	}
 
 	runInMillis(15 * 60 * 1000, 'deviceCheckFinish',)
