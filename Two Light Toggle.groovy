@@ -55,6 +55,9 @@ preferences {
 		input "roomButton", "capability.pushableButton", title: "Button", multiple: false
 		input "buttonAction", "enum", title: "Button action", options: ["pushed", "doubleTapped", "held"], required: true
 	}
+	section("<b>Motion Controls</b>") {
+		input "motionActive", "capability.switch", title: "Motion control active flag", multiple: false
+	}
 }
 
 def installed() {
@@ -102,7 +105,7 @@ void twoLightToggle(evt) {
 
 void twoColorToggle(evt) {	
 	if (now() > (state.LastPress + 2000)) {
-		if (primaryLight.latestValue("switch") == "off") {
+		if (primaryLight.latestValue("switch") == "off" || motionActive.latestValue("switch") == "on") {
 			if (priTempToggle) {
 				primaryLight.setColorTemperature(priTempVal, priTempLevel)
 			} else {
@@ -147,6 +150,7 @@ void twoColorToggle(evt) {
 	}
 	
 	state.LastPress = now()
+	if ( motionActive ) motionActive.off()
 }
 
 void toggle(devSwitch) {
