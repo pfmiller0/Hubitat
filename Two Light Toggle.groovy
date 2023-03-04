@@ -19,20 +19,26 @@ preferences {
 	section() {
 		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
-    section("Lights") {
+    section("<b>Lights</b>") {
     	input "colorToggle", "bool", title: "Color toggle mode", submitOnChange: true
 		input "primaryLight", "capability.colorControl", title: "Primary Light", multiple: false
 		if (colorToggle) {
 			if (priTempToggle) {
-				input "priTemp", "string", title: "Primary Temperature <i style=\"font-size:80%\">[colorTemperature:9000, level:100]</i>", defaultValue: '[colorTemperature:4500, level:50]'
+				input "priTempVal", "integer", title: "Primary Temperature", range: "1500..9000", defaultValue: 4500
+				input "priTempLevel", "integer", title: "Primary level", range: "0..100", defaultValue: 50
 			} else {
-				input "priColor", "string", title: "Primary Color <i style=\"font-size:80%\">[hue:100, saturation:100, level:100]</i>", defaultValue: '[hue:50, saturation:50, level:50]'
+				input "priColorHue", "integer", title: "Primary Color Hue", range: "0..100", defaultValue: 50
+				input "priColorSat", "integer", title: "Primary Color Saturation", range: "0..100", defaultValue: 50
+				input "priColorLevel", "integer", title: "Primary Color level", range: "0..100", defaultValue: 50
 			}
 			if (!secRandom) {
 				if (secTempToggle) {
-					input "secTemp", "string", title: "Secondary Temperature <i style=\"font-size:80%\">[colorTemperature:9000, level:100]</i>", defaultValue: '[colorTemperature:4500, level:50]'
+					input "secTempVal", "integer", title: "Secondary Temperature", range: "1500..9000", defaultValue: 4500
+					input "secTempLevel", "integer", title: "Secondary level", range: "0..100", defaultValue: 50
 				} else {
-					input "secColor", "string", title: "Secondary Color <i style=\"font-size:80%\">[hue:100, saturation:100, level:100]</i>", defaultValue: '[hue:50, saturation:50, level:50]'
+					input "secColorHue", "integer", title: "Secondary Color Hue", range: "0..100", defaultValue: 50
+					input "secColorSat", "integer", title: "Secondary Color Saturation", range: "0..100", defaultValue: 50
+					input "secColorLevel", "integer", title: "Secondary Color level", range: "0..100", defaultValue: 50
 				}
 			}
 			input "priTempToggle", "bool", title: "Primary use color temp", submitOnChange: true
@@ -45,7 +51,7 @@ preferences {
 		}
 
 	}
-	    section("Button") {
+	section("<b>Button</b>") {
 		input "roomButton", "capability.pushableButton", title: "Button", multiple: false
 		input "buttonAction", "enum", title: "Button action", options: ["pushed", "doubleTapped", "held"], required: true
 	}
@@ -68,9 +74,9 @@ def initialize() {
 	if (isPaused == false) {
 		//subscribe(location, "systemStart", startupEvent)
 		if (!colorToggle) {
-			subscribe(roomButton, buttonAction, twoLightToggle)
+			subscribe(roomButton, buttonAction, 'twoLightToggle')
 		} else {
-			subscribe(roomButton, buttonAction, twoColorToggle)
+			subscribe(roomButton, buttonAction, 'twoColorToggle')
 		}
 
 		state.LastPress = 0
@@ -96,9 +102,16 @@ void twoLightToggle(evt) {
 
 void twoColorToggle(evt) {	
 	if (now() > (state.LastPress + 2000)) {
-		toggle(primaryLight)
+		if (primaryLight.latestValue("switch") == "off") {
+			if (priTempToggle) {
+				primaryLight.setColorTemperature(priTempVal, priTempLevel)
+			} else {
+				primaryLight.setColor([hue: priColorHue, saturation: priColorSat, level: priColorLevel])
+			}
+		} else {
+			primaryLight.off()
+		}
 	} else {
-		Map priColor = priTempToggle ? evaluate(priTemp) : evaluate(priColor)
 		Map curColor = [:]
 
 		if ( primaryLight.latestValue("colorMode") == "RGB" ) {
@@ -109,11 +122,9 @@ void twoColorToggle(evt) {
 
 		if (curColor != priColor) {
 			if (priTempToggle) {
-				//primaryLight.setLevel(priColor["level"]);
-				//primaryLight.setColorTemperature(priColor["colorTemperature"])
-				primaryLight.setColorTemperature(priColor["colorTemperature"], priColor["level"])
+				primaryLight.setColorTemperature(priTempVal, priTempLevel)
 			} else {
-				primaryLight.setColor(priColor)
+				primaryLight.setColor([hue: priColorHue, saturation: priColorSat, level: priColorLevel])
 			}
 		} else {
 			Map secColor = [:]
@@ -124,12 +135,10 @@ void twoColorToggle(evt) {
 				Integer satRnd = (time % 30) + 1
 				secColor = ["hue": hueRnd, "saturation": 100 - satRnd, "level": 50]
 			} else {
-				secColor = secTempToggle ? evaluate(secTemp) : evaluate(secColor)
+				secColor = secTempToggle ? [colorTemperature: secTempVal, level: secTempLevel] : [hue: secColorHue, saturation: secColorSat, level: secColorLevel]
 			}
 
 			if (secTempToggle) {
-				//primaryLight.setLevel(secColor["level"]);
-				//primaryLight.setColorTemperature(secColor["colorTemperature"])
 				primaryLight.setColorTemperature(secColor["colorTemperature"], secColor["level"])
 			} else {
 				primaryLight.setColor(secColor)
