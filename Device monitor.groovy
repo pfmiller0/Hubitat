@@ -69,6 +69,7 @@ void deviceCheckFinish() {
  	if (debugMode) log.debug "params: $params"
 	List<String> offlineDevs = []
 	List<String> notificationList = []
+	List<String> clearedList = []
 	Long updateThreshold = now() - (6 * 60 * 60 * 1000) // 6 hrs
 
 	batteryDevices.each { dev ->
@@ -80,9 +81,17 @@ void deviceCheckFinish() {
 			offlineDevs << dev.getLabel()
 		}
 	}
-	
 	if (notificationList != [] ) {
 		notifyDevice.deviceNotification "New offline devices found: ${notificationList}"
+	}
+	
+	if ( state.notifiedDevs != offlineDevs ) {
+		//log.debug "notifiedDevs: ${state.notifiedDevs}, offlineDevs: ${offlineDevs}"
+		clearedList = state.notifiedDevs - offlineDevs
+		//log.debug "clearedList: ${clearedList}"
+		if (clearedList != [] ) {
+			notifyDevice.deviceNotification "Restored devices found. Update battery changed date: ${clearedList}"
+		}
 	}
 	
 	state.notifiedDevs = offlineDevs
