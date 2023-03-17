@@ -105,7 +105,9 @@ void twoLightToggle(evt) {
 
 void twoColorToggle(evt) {	
 	if (now() > (state.LastPress + 2000)) {
-		if (primaryLight.latestValue("switch") == "off" || motionActive.latestValue("switch") == "on") {
+		if (primaryLight.latestValue("switch") == "off") {
+			primaryLight.on()
+		} else if (motionActive.latestValue("switch") == "on") {
 			if (priTempToggle) {
 				primaryLight.setColorTemperature(priTempVal, priTempLevel)
 			} else {
