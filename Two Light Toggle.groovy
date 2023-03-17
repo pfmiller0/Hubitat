@@ -24,21 +24,21 @@ preferences {
 		input "primaryLight", "capability.colorControl", title: "Primary Light", multiple: false
 		if (colorToggle) {
 			if (priTempToggle) {
-				input "priTempVal", "integer", title: "Primary Temperature", range: "1500..9000", defaultValue: 4500
-				input "priTempLevel", "integer", title: "Primary level", range: "0..100", defaultValue: 50
+				input "priTempVal", "integer", title: "Primary Temperature", range: "1500..9000", width: 6, defaultValue: 4500
+				input "priTempLevel", "integer", title: "Primary level", range: "0..100", width: 6, defaultValue: 50
 			} else {
-				input "priColorHue", "integer", title: "Primary Color Hue", range: "0..100", defaultValue: 50
-				input "priColorSat", "integer", title: "Primary Color Saturation", range: "0..100", defaultValue: 50
-				input "priColorLevel", "integer", title: "Primary Color level", range: "0..100", defaultValue: 50
+				input "priColorHue", "integer", title: "Primary Color Hue", range: "0..100", width: 4, defaultValue: 50
+				input "priColorSat", "integer", title: "Primary Color Saturation", range: "0..100", width: 4, defaultValue: 50
+				input "priColorLevel", "integer", title: "Primary Color level", range: "0..100", width: 4, defaultValue: 50
 			}
 			if (!secRandom) {
 				if (secTempToggle) {
-					input "secTempVal", "integer", title: "Secondary Temperature", range: "1500..9000", defaultValue: 4500
-					input "secTempLevel", "integer", title: "Secondary level", range: "0..100", defaultValue: 50
+					input "secTempVal", "integer", title: "Secondary Temperature", range: "1500..9000", width: 6, defaultValue: 4500
+					input "secTempLevel", "integer", title: "Secondary level", range: "0..100", width: 6, defaultValue: 50
 				} else {
-					input "secColorHue", "integer", title: "Secondary Color Hue", range: "0..100", defaultValue: 50
-					input "secColorSat", "integer", title: "Secondary Color Saturation", range: "0..100", defaultValue: 50
-					input "secColorLevel", "integer", title: "Secondary Color level", range: "0..100", defaultValue: 50
+					input "secColorHue", "integer", title: "Secondary Color Hue", range: "0..100", width: 4, defaultValue: 50
+					input "secColorSat", "integer", title: "Secondary Color Saturation", range: "0..100", width: 4, defaultValue: 50
+					input "secColorLevel", "integer", title: "Secondary Color level", range: "0..100", width: 4, defaultValue: 50
 				}
 			}
 			input "priTempToggle", "bool", title: "Primary use color temp", submitOnChange: true
