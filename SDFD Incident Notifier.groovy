@@ -31,13 +31,13 @@ preferences {
 			} else {
 				paragraph "<p align='center'>No active incidents</p>"
 			}
-			paragraph "<p align='right' style='font-size:90%;'><a href='http://hubitat/installedapp/events/${app.id}'>Incident history</a></p>"
+			paragraph "<p align='right' style='font-size:90%;'><a href='/installedapp/events/${app.id}'>Incident history</a></p>"
 		}
 	}
 	section("<b>Notifications</b>") {
 		input "notifyDevice", "capability.notification", title: "Notification device", multiple: false, required: false
-		input "notifyDist", "decimal", title: "Notification distance", defaultValue: 1, required: true
-		input "notifyUnits", "string", title: "Notification unit (if distance is unknown)"
+		input "notifyDist", "decimal", title: "Notification distance", defaultValue: 1, required: true, width: 6
+		input "notifyUnits", "string", title: "Notification unit (if distance is unknown)", width: 6
 	}
 	section("<b>Queries</b>") {
 		input "update_interval", "number", title: "Update frequency (mins)", defaultValue: 5, required: true
