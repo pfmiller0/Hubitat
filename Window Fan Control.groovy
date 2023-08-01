@@ -51,12 +51,12 @@ preferences {
 		}
 	}
 	section("<b>Temperature control</b>") {
-		input "tempTargetCooling", "decimal", title: "Target temperature (Cooling)", defaultValue: 69
-		input "tempTargetHeating", "decimal", title: "Target temperature (Heating)", defaultValue: 71
+		input "tempTargetCooling", "decimal", title: "Target temperature (Cooling)", width: 6, defaultValue: 69
+		input "tempTargetHeating", "decimal", title: "Target temperature (Heating)", width: 6, defaultValue: 71
 		input "tempMode", "enum", title: "Mode", options: ["Cooling", "Heating", "Auto"], description: "Enter mode", defaultValue: "Auto"
 		input "tempAutoModeChangeThreshold", "decimal", title: "Auto mode change threshold", defaultValue: 5
-		input "tempAfternoonAdjust", "decimal", title: "Afternoon temperature adjustment", defaultValue: 3
-		input "tempHeatAdjust", "decimal", title: "Heating mode temperature adjustment", defaultValue: 3
+		input "tempAfternoonAdjust", "decimal", title: "Afternoon temperature adjustment", width: 6, defaultValue: 3
+		input "tempHeatAdjust", "decimal", title: "Heating mode temperature adjustment", width: 6, defaultValue: 3
 	}
 
 	section("<b>Devices</b>") {
@@ -70,8 +70,8 @@ preferences {
 	section("<b>Debug</b>") {
 		input "debugMode", "bool", title: "Enable debug logging", defaultValue: false, submitOnChange: true
 		if (debugMode) {
-			input "tempInDebug", "number", title: "Inside temp override"
-			input "tempOutDebug", "number", title: "Outside temp override"
+			input "tempInDebug", "decimal", title: "Inside temp override", width: 6
+			input "tempOutDebug", "decimal", title: "Outside temp override", width: 6
 		}
 	}
 }
