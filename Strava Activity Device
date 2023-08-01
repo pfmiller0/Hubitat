@@ -1,12 +1,7 @@
 /**
- *  Strava Activity Notifier
- *	Notify when Strava Activity is posted
+ *  Strava Activity virtual device
  * 
  *  Copyright 2022 Peter Miller
- *
- *  Based on code from Google SDM Api 0.6.0 by David Kilgore
- *  https://github.com/dkilgore90/google-sdm-api
- *  Copyright 2020 David Kilgore. All Rights Reserved
  *
  *  This software is free for Private Use. You may use and modify the software without distributing it.
  *  If you make a fork, and add new code, then you should create a pull request to add value, there is no
@@ -17,7 +12,6 @@
  *  Software is provided without warranty and your use of it is at your own risk.
  *
  */
-
 
 //String appVersion() { return "1.5" }
 
@@ -44,14 +38,21 @@ def mainPage() {
 			section("<b>Strava user ${state.StravaUser.firstname} ${state.StravaUser.lastname} logged in</b>") {}
 		}
 		section('<b>Connection settings</b> (from <a target="_blank" href="https://www.strava.com/settings/api">Strava</a>)') {
-			input 'client_id', 'string', title: 'Strava API client_id'
-			input 'client_secret', 'string', title: 'Strava API client_secret'
+			input 'client_id', 'string', title: 'Strava API client_id', required: true
+			input 'client_secret', 'string', title: 'Strava API client_secret', required: true
+			input "presence_device", "capability.presenceSensor", title: "Presence device", description: "If set don't query for new activities while present", multiple: false, required: false
+		}
+		section('<b>Location name lookup</b> (from <a target="_blank" href="https://home.openweathermap.org/users/sign_up">OpenWeather</a>)') {
+			input 'owmApiKey', 'string', title: 'OpenWeather api key (optional)', description: "To lookup activity location name when not reported by Strava", required: false
 		}
 		getAuthLink()
 	}
 }
 
 def initialize(evt) {
+	def stravaDev = getChildDevice("StravaActivity_${app.id}")
+	if (!stravaDev) stravaDev = addChildDevice("hyposphere.net", "Virtual Strava Activity Driver", "StravaActivity_${app.id}", null, [label: thisName, name: thisName])
+
 	if (isPaused == false) {
 		rescheduleLogin()
 	} else {
@@ -60,9 +61,26 @@ def initialize(evt) {
 }
 
 def updated() {
+	//state.remove('lastActivityTime')
+	def stravaDev = getChildDevice("StravaActivity_${app.id}")
+	if (!stravaDev) stravaDev = addChildDevice("hyposphere.net", "Virtual Strava Activity Driver", "StravaActivity_${app.id}", null, [label: thisName, name: thisName])
+
+	state.weeklyDist = state.weeklyDist ?: [:]
 	if (isPaused == false) {
-		rescheduleLogin()
+		//rescheduleLogin()
 		subscribe(location, 'systemStart', 'initialize')
+		getNewActivities()
+		//pastWeekActivities()
+		//pastMonthActivities()
+		//exportEvents()
+		if (presence_device == null) {
+			schedule('20 */2 10-22 ? * *', 'getNewActivities')
+		} else {
+			subscribe(presence_device, 'presence', 'presenceChanged')
+			presenceChanged()
+		}
+		schedule('0 55 23 ? * SUN', 'pastWeekActivities')
+		schedule('0  5  0 1 *   ?', 'pastMonthActivities')
 	} else {
 		unschedule()
 		unsubscribe()
@@ -75,9 +93,21 @@ def installed() {
 }
 
 def uninstalled() {
+	deleteChildDevice("StravaActivity_${app.id}")
 	unschedule()
 	unsubscribe()
 }
+
+void presenceChanged(evt) {
+	if (presence_device.latestValue("presence") == "not present") {
+		schedule('20 * * ? * *', 'getNewActivities')
+	} else {
+		unschedule('getNewActivities')
+		runIn(300, 'getNewActivities') // Schedule one last check
+	}
+}
+
+// Authentication queries
 
 mappings {
 	path("/handleAuth") {
@@ -110,7 +140,7 @@ String buildAuthUrl() {
 			'&response_type=code&' +
 			'redirect_uri=https://cloud.hubitat.com/oauth/stateredirect' +
 			'&state=' + getHubUID() + '/apps/' + app.id + '/handleAuth?access_token=' + state.accessToken +
-			'&approval_prompt=force&scope=read'
+			'&approval_prompt=force&scope=activity:read_all'
 	return url
 }
 
@@ -119,12 +149,9 @@ def handleAuthRedirect() {
 	String authCode = params.code
 	login(authCode)
 	runEvery3Hours('refreshLogin')
-	StringBuilder builder = new StringBuilder()
-	builder << "<!DOCTYPE html><html><head><title>Hubitat Elevation - Strava</title></head>"
-	builder << "<body><p>Congratulations! Strava has authenticated successfully</p>"
-	builder << "<p><a href=https://${location.hub.localIP}/installedapp/configure/${app.id}/mainPage>Click here</a> to return to the App main page.</p></body></html>"
-	
-	String html = builder.toString()
+	String html = "<!DOCTYPE html><html><head><title>Hubitat Elevation - Strava</title></head>" +
+					"<body><p>Congratulations! Strava has authenticated successfully</p>" +
+					"<p><a href=https://${location.hub.localIP}/installedapp/configure/${app.id}/mainPage>Click here</a> to return to the App main page.</p></body></html>"
 
 	render contentType: "text/html", data: html, status: 200
 }
@@ -167,7 +194,7 @@ void refreshLogin() {
 				]
 	Map params = [uri: uri, query: query]
 
-	log.debug('Refreshing access_token from Strava')
+	//log.debug('Refreshing access_token from Strava')
 
 	try {
 		httpPost(params) { response -> handleLoginResponse(response) }
@@ -177,16 +204,315 @@ void refreshLogin() {
 }
 
 void handleLoginResponse(resp) {
-	String respCode = resp.getStatus()
-	Map respJson = resp.getData()
-	
-	//log.debug("response: ${respJson}")
-	log.info("Strava athlete authenticated: ${respJson.athlete.firstname} ${respJson.athlete.lastname}")
-	
-	state.StravaUser = respJson.athlete
-	
-	if (respJson.refresh_token) {
-		state.StravaRefreshToken = respJson.refresh_token
+	if (resp.getStatus() == 200) {
+		Map respJson = resp.getData()
+		if (respJson.athlete) { // athlete isn't returned for login refresh
+			log.info("Strava athlete authenticated: ${respJson.athlete.firstname} ${respJson.athlete.lastname}")
+			state.StravaUser = respJson.athlete
+			//stravaDev.setAthlete(respJson.athlete)
+		}
+
+		if (respJson.refresh_token) {
+			state.StravaRefreshToken = respJson.refresh_token
+		}
+		state.StravaAccessToken = respJson.access_token
+	} else {
+		log.error("Strava login error: ${resp.getStatus()}")
 	}
-	state.StravaAccessToken = respJson.access_token
 }
+
+//
+// Activity queries
+//
+
+void pastWeekActivities() {
+	/* https://docs.oracle.com/javase/1.5.0/docs/api/java/util/Calendar.html
+	Date d = new Date()
+	
+	Integer hour = d[Calendar.HOUR_OF_DAY]
+	Integer month = d[Calendar.MONTH]+1
+	Integer day_of_week = d[Calendar.DAY_OF_WEEK]
+	*/
+	Integer timeNow = (Integer) Math.floor(now() / 1000)
+	getActivities(timeNow - 60*60*24*7, timeNow, "week")
+	//[11,12,13,14,15].each {getActivities(timeNow - 60*60*24*7 - 60*60*24*7*it, timeNow - 60*60*24*7*it, "week")}
+}
+
+void pastMonthActivities() {
+	Integer timeNow = (Integer) Math.floor(now() / 1000)
+//	getActivities(timeNow - 60*60*24*35, timeNow - 60*60*24*5, "month")
+	getActivities(timeNow - 60*60*24*30, timeNow, "month")
+}
+
+void exportEvents() {
+	Integer timeNow = (Integer) Math.floor(now() / 1000)
+	getActivities(1, timeNow, "export")
+}
+
+void getNewActivities() {
+	Integer minsAway = 0
+	// query every 5 minutes, no presence 132: queries/day
+	if (presence_device == null) {
+		minsAway = -1
+	} else if (presence_device.latestValue("presence") == "present") {
+		minsAway = -1
+	} else {
+		minsAway = (now() - presence_device.currentState("presence").date.time) / (1000 * 60)
+	}
+
+	// If "not present" for greater than 2 hours, revert to one query per hour
+	if ( (minsAway != 0 && minsAway <= 120) || (minsAway > 120 && minsAway % 60 == 0) ) {
+		Integer timeNow = (Integer) Math.floor(now() / 1000)
+        log.info "minsAway == $minsAway"
+		if (state.lastActivityTime) {
+			/***/
+			getActivities(state.lastActivityTime, timeNow, "new")
+			/***
+			getActivities(timeNow - 60*60*24 , timeNow, "new")
+			/***/
+		} else {
+			getActivities(timeNow - 60*60*24*30, timeNow, "new")
+		}
+	}
+}
+
+void getActivities(Integer after_time, Integer before_time, String query_type) {
+	//https://developers.strava.com/docs/reference/#api-Activities-getLoggedInAthleteActivities
+	//http GET "https://www.strava.com/api/v3/athlete/activities?before=&after=&page=&per_page=" "Authorization: Bearer [[token]
+
+	String uri = 'https://www.strava.com/api/v3/athlete/activities'
+	def headers = [ Authorization: "Bearer ${state.StravaAccessToken}" ]
+	def contentType = 'application/json'
+	def ts = now()
+	
+	Map query = [
+		after:		after_time,
+		before:		before_time,
+		per_page:	50,
+		page:		1
+	]
+	
+	log.info("Querying Strava for runs (${after_time - 1671000000}, ${before_time - 1671000000})")
+	Map params = [ uri: uri, headers: headers, contentType: contentType, query: query ]
+	asynchttpGet('handleGetActivities', params, [query_type: query_type, time: before_time, after_time: after_time])
+}
+
+void handleGetActivities(resp, data) {
+	def respCode = resp.getStatus()
+	List<Map> activities
+	
+    String respMimetype = ''
+    if (resp.getHeaders() && resp.getHeaders()["Content-Type"]) {
+    	respMimetype = resp.getHeaders()["Content-Type"].split(";")[0]
+	}
+	
+	if (resp.hasError() || respMimetype != "application/json" ) {
+        if (respMimetype != "application/json" ) {
+            log.error "Response type '${respMimetype}', JSON expected"
+        }
+		log.error("Error code: $respCode")
+		try {
+			log.error(resp.getErrorData())
+		} catch (Exception ignored) {
+		//	no response body
+		}
+	} else {
+		def stravaDev = getChildDevice("StravaActivity_${app.id}")
+		
+		if (data.query_type == "export") {
+			activities = cleanupList(resp.getJson(), true)
+		} else {
+			activities = cleanupList(resp.getJson())
+		}
+		
+		if (activities) {
+			log.info "${data.query_type} activities:"
+		}
+
+		if (data.query_type == "new") {
+			if (activities) {
+				//log.debug("Queried Strava for runs (${data.after_time - 1671000000}, ${data.time - 1671000000})")
+				state.lastActivityTime = data.time
+				activities.each {
+					//log.debug it
+	 				stravaDev.setActivity(meters2miles(it.distance), it.moving_time, it.sport_type, it.name)
+					//log.debug "speed: ${it.average_speed} ${it.average_speed/1.609}"
+					//log.debug "pace:  ${60/it.average_speed} ${60/it.average_speed/1.609}"
+					//stravaDev.setDate(date)
+				}
+			}
+		} else if (data.query_type == "week" || data.query_type == "month") {
+			Integer total_runs = 0
+			Integer total_dist = 0
+			Integer total_time = 0
+			activities.each {
+				if (it.sport_type == "Run") {
+					//log.debug it
+					total_runs ++
+					total_time += it.moving_time
+					total_dist += it.distance
+				}
+			}
+            if (data.query_type == "week") {
+                Date weekDate = new Date((Long)data.time*1000)
+                state.weeklyDist[("${weekDate[Calendar.YEAR]}_${weekDate[Calendar.WEEK_OF_YEAR]}")] = meters2miles(total_dist)
+            }
+			stravaDev.setThisWeekDistance(meters2miles(total_dist))
+			stravaDev.setThisWeekTime(total_time/60)
+			stravaDev.setThisWeekPace(meters2miles(total_dist)/(total_time/(60*60)))
+			log.info "Past ${data.query_type}: ${total_runs} runs, ${printTime(total_time)} (${meters2miles(total_dist)} miles)"
+		} else if (data.query_type == "export") {
+			if (activities) {
+				runtimes = []
+				activities.each {
+					runtimes << sprintf("%d:%2d", it.start_date[Calendar.HOUR_OF_DAY], it.start_date[Calendar.MINUTE])
+				}
+				log.debug runtimes
+			}
+		} else {
+			log.error "Unknown query type: $data"
+		}
+	}
+}
+
+List<Map> cleanupList(List<Map> activities, boolean isExport = false) {
+	List<Map> cleanActivities = []
+		
+	activities.each {
+		if (it.has_heartrate && ! isExport) {
+			String city
+			String state
+			String country
+			Date end_date
+		
+			if (owmApiKey && ! it.location_city) {
+				loc_lookup = openWeatherMapReverseGeocode(owmApiKey, it.start_latlng)
+				if (loc_lookup) {
+					city = loc_lookup[0].name
+					state = loc_lookup[0].state
+					country = loc_lookup[0].country
+				}
+			} else {
+				city = it.location_city
+				state = it.location_state
+				country = it.location_country
+			}
+						
+			end_date = new Date(toDateTime(it.start_date).time + (it.elapsed_time*1000))
+					
+			cleanActivities << [
+					name: it.name,
+					distance: it.distance,							// m
+					moving_time: it.moving_time,					// s
+					elapsed_time: it.elapsed_time,					// s
+					average_speed: it.average_speed * 3.6,			// km/h
+					max_speed: it.max_speed * 3.6,					// km/h
+					average_cadence: it.average_cadence * 2,		// spm
+					has_heartrate: it.has_heartrate,				// bpm
+					average_heartrate: it.average_heartrate,		// bpm
+					max_heartrate: it.max_heartrate,				// bpm
+					total_elevation_gain: it.total_elevation_gain,	// m
+					type: it.type,
+					sport_type: it.sport_type,
+					start_date: toDateTime(it.start_date),
+					end_date: end_date,
+					TIMESTAMP: (Integer) Math.floor(end_date.time / 1000) - 1671000000,
+					timezone: it.timezone,
+					start_latlng: it.start_latlng,
+					end_latlng: it.end_latlng,
+					location_city: city,
+					location_state: state,
+					location_country: country
+			]
+		} else {
+			cleanActivities << [
+					name: it.name,
+					distance: it.distance,							// m
+					moving_time: it.moving_time,					// s
+					elapsed_time: it.elapsed_time,					// s
+					average_speed: it.average_speed * 3.6,			// km/h
+					max_speed: it.max_speed * 3.6,					// km/h
+					average_cadence: '',
+					has_heartrate: it.has_heartrate,				// bpm
+					average_heartrate: '',
+					max_heartrate: '',
+					total_elevation_gain: '',
+					type: it.type,
+					sport_type: it.sport_type,
+					start_date: toDateTime(it.start_date),
+					end_date: end_date,
+					TIMESTAMP: (Integer) Math.floor(end_date.time / 1000) - 1671000000,
+					timezone: '',
+					start_latlng: '',
+					end_latlng: '',
+					location_city: '',
+					location_state: '',
+					location_country: ''
+			]
+		}
+	}
+	//log.debug "size: ${incidents.size()}, clean: ${cleanInc.size()}"
+	
+	return cleanActivities
+}
+
+// Utility methods
+
+def openWeatherMapReverseGeocode(String ApiKey, List<Float> latlng) {
+	// docs: openweathermap.org/api/geocoding-api
+	
+	String uri = 'http://api.openweathermap.org/geo/1.0/reverse'
+	def result
+	
+	def contentType = 'application/json'	
+	Map query = [
+		lat:		latlng[0],
+		lon:		latlng[1],
+		limit:		5,
+		appid:		ApiKey
+	]
+	Map params = [ uri: uri, contentType: contentType, query: query ]
+	
+	//log.info('Querying openweathermaps')
+	
+	try {
+		httpGet(params) { resp ->
+			if (resp.getStatus() != 200 ) {
+				log.error "HTTP error: " + resp.getStatus()
+				return
+			} 
+			result = resp.getData()
+		}
+	} catch (e) {
+		log.error "Error retrieving installed apps: ${e}"
+	}
+	return result
+}
+
+void logJson(def data) {
+	log.debug groovy.json.JsonOutput.toJson(data)
+}
+
+String printTime(Integer eventSeconds) {
+	String out=""
+	
+	Integer hours
+	Integer mins
+	Integer seconds
+
+	hours = eventSeconds.intdiv(3600)
+	mins = (eventSeconds - (hours * 3600)).intdiv(60)
+	seconds = eventSeconds - (hours * 3600) - (mins * 60)
+	
+	out=sprintf("%d:%02d:%02d", hours, mins, seconds)
+	
+	return out
+}
+
+BigDecimal meters2miles (BigDecimal m) {
+	return roundoff(m/(1000 * 1.609))
+}
+
+BigDecimal roundoff(BigDecimal n) {
+	// BigDecimal.round(i) available in newer groovy
+	return Math.round(n*100)/100
