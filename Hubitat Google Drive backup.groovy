@@ -301,11 +301,12 @@ void downloadLatestBackup(evt=null) {
 		uri: uri,
 		requestContentType: 'application/octet-stream',
 		contentType: 'application/octet-stream',
-		timeout: 60,
+		timeout: 120,
 		ignoreSSLIssues: true
 	]
 
 	try {
+		logDebug("Downloading backup...")
 		asynchttpGet('handleDownloadLatestBackup', params, [data: null])
 	} catch (groovyx.net.http.HttpResponseException e) {
 		log.error("Error downloading latest backup: ${e.getLocalizedMessage()} (${e.response.data})")
@@ -319,7 +320,7 @@ void handleDownloadLatestBackup(hubitat.scheduling.AsyncResponse resp, Map data)
 	
 	if (resp.getStatus() != 200 ) {
 		if (resp.getStatus() == 408 ) {
-			log.error "HTTP error downloading backup: timeout ${resp.getStatus()})"
+			log.error "HTTP error downloading backup: timeout (${resp.getStatus()})"
 		} else {
 			log.error "HTTP error downloading backup: ${resp.getStatus()}"
 		}
@@ -656,7 +657,7 @@ def handleGetFilesToDelete(resp, data) {
 		def nextPage = respJson.nextPageToken ? true : false
 		def idList = []
 		respJson.files.each {
-			log.info "File to delete: ${it.name}"
+			//log.info "File to delete: ${it.name}"
 			idList.add(it.id)
 		}
 		if (idList) {
