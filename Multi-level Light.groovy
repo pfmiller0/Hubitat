@@ -26,14 +26,14 @@ preferences {
 		input "handleToggle", "bool", title: "Handle single press (toggle)"
 	}
 	section("<b>Light levels</b>") {
-		input "lightRaisePrimaryTemp", "number", title: "Raised primary temperature", range: "1500..9000", defaultValue: 3500
-		input "lightRaisePrimaryLevel", "number", title: "Raised primary level", range: "0..100", defaultValue: 50
-		input "lightRaiseSecTemp", "number", title: "Raised secondary temperature", range: "1500..9000", defaultValue: 3500
-		input "lightRaiseSecLevel", "number", title: "Raised secondary level", range: "0..100", defaultValue: 75
-		input "lightLowerPrimaryTemp", "number", title: "Lowered primary temperature", range: "1500..9000", defaultValue: 2500
-		input "lightLowerPrimaryLevel", "number", title: "Lowered primary level", range: "0..100", defaultValue: 10
-		input "lightLowerSecTemp", "number", title: "Lowered secondary temperature", range: "1500..9000", defaultValue: 2500
-		input "lightLowerSecLevel", "number", title: "Lowered secondary level", range: "0..100", defaultValue: 25
+		input "lightRaisePrimaryTemp", "number", title: "Raised primary temperature", width: 4, range: "1500..9000", defaultValue: 3500
+		input "lightRaisePrimaryLevel", "number", title: "Raised primary level", width: 4, range: "0..100", defaultValue: 50
+		input "lightRaiseSecTemp", "number", title: "Raised secondary temperature", width: 4, range: "1500..9000", defaultValue: 3500
+		input "lightRaiseSecLevel", "number", title: "Raised secondary level", width: 4, range: "0..100", defaultValue: 75
+		input "lightLowerPrimaryTemp", "number", title: "Lowered primary temperature", width: 4, range: "1500..9000", defaultValue: 2500
+		input "lightLowerPrimaryLevel", "number", title: "Lowered primary level", width: 4, range: "0..100", defaultValue: 10
+		input "lightLowerSecTemp", "number", title: "Lowered secondary temperature", width: 4, range: "1500..9000", defaultValue: 2500
+		input "lightLowerSecLevel", "number", title: "Lowered secondary level", width: 4, range: "0..100", defaultValue: 25
 	}
 	section("<b>Motion Controls</b>") {
 		input "motionActive", "capability.switch", title: "Motion control active flag", multiple: false
