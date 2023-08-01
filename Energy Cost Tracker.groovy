@@ -29,10 +29,27 @@ def mainPage() {
 			input "isPaused", "bool", title: "Pause app", defaultValue: false
 		}
 		
+		if (state.lastBillingPeriod) {
+			section("Current billing: <b>${state.lastBillingPeriod}</b>") { }
+		}
 		if (state.totalEnergyCost) {
-			section("Energy cost: <b>\$${state.totalEnergyCost}</b>") { }
-		
-			section("Reset") {
+			Date logStart = toDateTime(state.logStartDate)
+			java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("d MMM yyyy h:mm aa");
+	
+			section("<b>Energy stats</b>") {
+				paragraph sprintf('Energy cost: <b>$%.5f (%.2f kW-h)</b>', state.totalEnergyCost, state.totalEnergyUsed)
+				paragraph sprintf('Cost/day: <b>$%.5f</b>', state.totalEnergyCost / ((now() - logStart.getTime())/(1000 * 60 * 60 * 24) as BigDecimal))
+				paragraph sprintf('Cost since: %s', df.format(logStart))
+			}
+		}	
+
+		section("<b>Settings</b>") {
+			input "energyDev", "capability.energyMeter", title: "Energy meter", multiple: false
+			//input "notifyDev", "capability.notification", title: "Notification device", multiple: false, required: false
+		}
+
+		if (state.totalEnergyCost) {		
+			section("<b style='color:red'>Reset</b>") {
 	    		if (! state.showReset) {
 					input name: "btnReset", type: "button", title: "Reset counter?"
 				} else {
@@ -41,11 +58,6 @@ def mainPage() {
 					input name: "btnConfirm", type: "button", title: "<span style='color:red'>Yes</span>", width: 6
 				}	
 			}
-		}	
-
-		section("Settings") {
-			input "energyDev", "capability.energyMeter", title: "Energy meter", multiple: false
-			//input "notifyDev", "capability.notification", title: "Notification device", multiple: false, required: false
 		}
 	}
 }
@@ -65,17 +77,15 @@ void updated() {
 void initialize() {
 	if (isPaused == false) {
 		resetAppLabel()
-		/***
-        state.remove('totalEnergyCost')
-		/***/
+		state.totalEnergyUsed = state.totalEnergyUsed ?: 0.0
 		state.totalEnergyCost = state.totalEnergyCost ?: 0.0
 		state.lastBillingPeriod = state.lastBillingPeriod ?: getBillingPeriod()
 		state.lastHourRate = state.lastHourRate ?: getBillingRate(state.lastBillingPeriod)
-		state.prevTotalUse = state.prevTotalUse ?: energyDev?.latestValue("energy")
+		state.prevTotalUsed = state.prevTotalUsed ?: energyDev?.latestValue("energy")
 		state.oldMonthTotal = state.oldMonthTotal ?: energyDev.latestValue("currMonthTotal")
 
 		schedule('0 0 * ? * *', 'updateUsage')
-		/***/
+		/***
 		updateUsage()
 		/***/
 	} else {
@@ -89,7 +99,7 @@ Boolean isHoliday(Date d) {
 	String DAY = sprintf('%02d', d[Calendar.DAY_OF_MONTH])
 	
 	if (YEAR > 2024) {
-		if (d[Calendar.HOUR_OF_DAY] == 17) {
+		if (d[Calendar.HOUR_OF_DAY] == 20) {
 			log.warn "isHoliday: Holiday calendar for $YEAR missing"
 		}
 	}
@@ -137,18 +147,12 @@ BigDecimal getBillingRate(String period) {
 	
 	switch(period) {
 		case "on-peak":
-		case "sum-on-peak":
-		case "win-on-peak":
 			generation = 0.29697
 			break
 		case "off-peak":
-		case "sum-off-peak":
-		case "win-off-peak":
 			generation = 0.22574
 			break
 		case "super-off-peak":
-		case "sum-super-off-peak":
-		case "win-super-off-peak":
 			generation = 0.14854
 			break
 	}
@@ -259,35 +263,56 @@ String getBillingPeriod() {
 / Each hour get stored billing rate and calculate cost of last hours usage
 / Then get billing rate for next hour and store
 / TODO: Store cost in device to access from graph. Add price that can be set to device?
+/
+/ Also record cost by day, month, and billing period
 */
 void updateUsage(evt) {
 	String curBillingPeriod = getBillingPeriod()
 	BigDecimal curHourRate = getBillingRate(curBillingPeriod)
-	BigDecimal curTotalUse = energyDev.latestValue("energy")
+	BigDecimal curTotalUsed = energyDev.latestValue("energy")
 	
-	if (curTotalUse != state.prevTotalUse) {
-		BigDecimal lastHourUse = 0
-		if (curTotalUse > state.prevTotalUse) {
-			lastHourUse = curTotalUse - state.prevTotalUse
+	if (curTotalUsed != state.prevTotalUsed) {
+		BigDecimal lastHourUsed = 0
+		if (curTotalUsed > state.prevTotalUsed) {
+			lastHourUsed = curTotalUsed - state.prevTotalUsed
+			/***
+			log.debug "lastHourUsed = curTotalUsed ($curTotalUsed) - state.prevTotalUsed ($state.prevTotalUsed)"
+			log.debug "lastHourUsed = curMonthTotal - state.oldMonthTotal - state.prevTotalUsed"
+			log.debug "($lastHourUsed) ${energyDev.latestValue("currMonthTotal") - state.oldMonthTotal - state.prevTotalUsed} = ${energyDev.latestValue("currMonthTotal")} - $state.oldMonthTotal - $state.prevTotalUsed"
+			/***/
 		} else {
-			Date d = new Date()
-			BigDecimal curMonthTotal
-			if (d[Calendar.DAY_OF_MONTH] == 1) {
-				curMonthTotal = energyDev.latestValue("lastMonthTotal")
+			if (curTotalUsed == 0) {
+				Date d = new Date()
+				BigDecimal curMonthTotal
+				if (d[Calendar.DAY_OF_MONTH] == 1) {
+					curMonthTotal = energyDev.latestValue("lastMonthTotal")
+				} else {
+					curMonthTotal = energyDev.latestValue("currMonthTotal")
+				}
+				log.debug "New day!"
+				/***
+				lastHourUsed = curMonthTotal - state.oldMonthTotal - state.prevTotalUsed
+				log.debug "lastHourUsed = curTotalUsed ($curTotalUsed) - state.prevTotalUsed ($state.prevTotalUsed)"
+				log.debug "lastHourUsed = curMonthTotal - state.oldMonthTotal - state.prevTotalUsed"
+				log.debug "$lastHourUsed = $curMonthTotal - $state.oldMonthTotal - $state.prevTotalUsed"
+				/***/
+				state.oldMonthTotal = curMonthTotal
 			} else {
-				curMonthTotal = energyDev.latestValue("currMonthTotal")
+				lastHourUsed = curTotalUsed
 			}
-			lastHourUse = curMonthTotal - state.oldMonthTotal - state.prevTotalUse
-			state.oldMonthTotal = curMonthTotal
 		}
-		BigDecimal lastHourCost = lastHourUse * state.lastHourRate
+		BigDecimal lastHourCost = lastHourUsed * state.lastHourRate
 		
+		if (state.totalEnergyCost == 0) {
+			state.logStartDate = new Date()
+		}
+		state.totalEnergyUsed += lastHourUsed
 		state.totalEnergyCost += lastHourCost
 		
-		log.debug "curTotalUse: $curTotalUse, prevTotalUse: $state.prevTotalUse"
-		log.debug "Rate: $state.lastHourRate($state.lastBillingPeriod), Used: $lastHourUse, Cost: \$$lastHourCost, TotalCost: \$$state.totalEnergyCost"
+		//log.debug "curTotalUsed: $curTotalUsed, prevTotalUsed: $state.prevTotalUsed"
+		log.info "Rate: $state.lastBillingPeriod, Used: $lastHourUsed, Cost: \$$lastHourCost, TotalCost: \$$state.totalEnergyCost"
 
-		state.prevTotalUse = curTotalUse
+		state.prevTotalUsed = curTotalUsed
 	}
 
 	state.lastBillingPeriod = curBillingPeriod
@@ -303,6 +328,7 @@ void appButtonHandler(String btn) {
 			state.showReset = false
 			break
 		case "btnConfirm":
+			state.totalEnergyUsed = 0.0
 			state.totalEnergyCost = 0.0
 			state.showReset = false
 			//sendEvent(name: "On time", value: state.totalOnTime, unit: "minutes")
@@ -310,4 +336,3 @@ void appButtonHandler(String btn) {
 		default:
 			log.warn "Unhandled button press: $btn"
 	}
-}
