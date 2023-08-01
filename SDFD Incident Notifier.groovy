@@ -48,10 +48,23 @@ preferences {
 	}
 }
 
-List<String> IGNORE_INC() { ["Medical", "Medical Alert Alarm", "Advised Incident", "RAP", "Logistics", "Facilities", "Duty Mechanic", "Carbon Monoxide Alarm", "Page", "Move Up", "STAND BACK HOLD", "CAD Test", "Drill", "Ringing Alarm", "Elevator Rescue", "Lock in/out", "DMS", "Special Service", "yGT General Transport"] }
-List<String> REDUNDANT_TYPES() { ["Advised Incident (misc.)", "Alert 1", "Alert 2 Brn/Mont", "Alert 2 Still Alarm", "Fuel in Bilge", "Pump Truck", "Traffic Accidents", "Single Resource", "Single Engine Response", "Hazmat", "TwoEngines", "Medical Multi-casualty", "Vegetation NO Special Response", "MTZ - Vegetaton Inital Attack", "Structure Commercial", "Rescue", "Gaslamp", "Traffic Accident Freeway (NC)", "Nat Gas Leak BB", "Nat Gas SING ENG SDGE", "Vehicle vs. Structure"] }
-//List<String> NO_NOTIFICATION_TYPES() { ["Vehicle fire freeway", "Ringing alarm highrise", "Traffic Accident FWY", "Extinguished fire"] }
-List<String> AMBULANCE_UNITS() { ["M", "AM", "BLS"] }
+//List<String> IGNORE_INC() { ["Medical", "Advised Incident", "CAD Test", "Carbon Monoxide Alarm", "DMS", "Drill", "Duty Mechanic", "Elevator Rescue", "Facilities", "Lock in/out", "Logistics", "Medical Alert Alarm", "Move Up", "Page", "RAP", "Ringing Alarm", "Special Service", "Truck - Special Service", "yGT General Transport"] }
+List<String> IGNORE_INC() { ["Medical", "CAD Test", "Carbon Monoxide Alarm", "DMS", "Duty Mechanic", "Elevator Rescue", "Facilities", "Logistics", "Lock in/out", "Medical Alert Alarm", "Move Up", "RAP", "Ringing Alarm", "Special Service", "STAND BACK HOLD", "Traffic Accident FWY", "Traffic Accident (L1)",
+							 "Truck - Special Service", "yGT General Transport"] }
+List<String> REDUNDANT_TYPES() { ["Advised Incident (misc.)", "Alert 1", "Alert 2 Brn/Mont", "Alert 2 Still Alarm", "Fuel in Bilge", "Gaslamp", "Hazmat", "MTZ - Vegetaton Inital Attack", "Medical Multi-casualty", "Nat Gas Leak BB", "Nat Gas SING ENG SDGE", "Pump Truck", "Rescue", "Single Engine Response", "Single Resource", "Structure Commercial", "Traffic Accident Freeway (NC)", "Traffic Accidents", "TwoEngines", "Vegetation NO Special Response", "Vehicle vs. Structure"] }
+List<String> NO_NOTIFICATION_TYPES() { ["Extinguished Fire", "Ringing Alarm Highrise", "Traffic Accident FWY", "Vehicle Fire Freeway"] }
+List<String> AMBULANCE_UNITS() { ["M", "BLS", "SDGE"] } // Add MS?
+
+void INCIDENT_UNIT_CHECK(List<Map> incidents) {
+	inc_types= ["Truck - Special Service", "yGT General Transport"]
+		
+	incidents.each { inc ->
+		// Drop incidents with no units or IncidentNumber
+		if (inc_types.any {it == inc.CallType}) {
+			log.debug "Units for ${inc.CallType}: ${inc.Units*.Code.sort()}"
+		}
+	}
+}
 	
 void installed() {
 	//if (debugMode) log.debug "Installed with settings: ${settings}"
@@ -66,6 +79,16 @@ void updated() {
 	unsubscribe()
 	unschedule()
 	initialize()
+
+	/*** Intersection lookup test ***
+	Float d
+	String[] loc
+    //loc = ["Arch St", "MEADE AVE/NEW JERSEY ST"]
+    loc = ["13th St", "Island Av/Market St"]
+	//loc = ['''32°35'07.6"N 116°52'19.1"W''', ""]
+	d = getDistance(getIncidentCoords(loc[0], loc[1]), [location.latitude, location.longitude])
+	log.debug "$loc is $d miles away"
+	/********************************/
 }
 
 void initialize() {
@@ -105,7 +128,7 @@ void incidentCheck() {
 
 	try {
 		asynchttpGet('httpResponse', params, [data: null])
-	} catch (e) {
+	} catch (Exception e) {
 		log.error "There was an error: $e"	
 	}
 }
@@ -116,9 +139,17 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	List<Map> activeIncidents = []
 	List<Map> resolvedIncidents = []
 	List<Map> updatedActiveIncidents = []
+    
+    String respMimetype = ''
+    if (resp.getHeaders() && resp.getHeaders()["Content-Type"]) {
+    	respMimetype = resp.getHeaders()["Content-Type"].split(";")[0]
+	}
 
 	/***** Backoff on error *****/
-	if (resp.getStatus() != 200 ) {	
+	if (resp.getStatus() != 200 || respMimetype != "application/json") {
+        if (respMimetype != "application/json" ) {
+            log.error "Response type '${respMimetype}', JSON expected"
+        }
         state.failCount++
 		unschedule('incidentCheck')
 		if (state.failCount <= 4 ) {
@@ -142,6 +173,13 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 			unschedule('incidentCheck')
             schedule('0 */' + update_interval + ' * ? * *', 'incidentCheck')
 		}
+	}
+    	
+	try {
+		INCIDENT_UNIT_CHECK(resp.getJson())
+	} catch (groovy.json.JsonException e) {
+		log.error "Invalid json returned"
+		return
 	}
 
 	// reorganize incident data -> remove ignored types -> remove medical incidents
@@ -182,7 +220,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		logIncidents(newIncidents, "NEW")
 				
 		// Get incidents for notification
-		//newIncidents = filterIncidentType(newIncidents, NO_NOTIFICATION_TYPES())
+		newIncidents = filterIncidentType(newIncidents, NO_NOTIFICATION_TYPES())
 		newIncidents = getLocalIncidents(newIncidents, notifyUnits)
 		
 		if (newIncidents && notifyDevice) notifyDevice.deviceNotification incidentsToStr(newIncidents, "MIN")	
@@ -227,8 +265,12 @@ List<Map> cleanupList(List<Map> incidents) {
 	incidents.each { inc ->
 		// Drop incidents with no units or IncidentNumber
 		if (inc.Units.size > 0 && inc.MasterIncidentNumber != "") {
-			// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that out fo ResponseDate. Normalize address case.
-			cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate.replaceAll('\\.[0-9]{2}-', '-'), CallType: inc.CallType, IncidentTypeName: inc.IncidentTypeName, Address: toTitleCase(inc.Address), CrossStreet: toTitleCase(inc.CrossStreet), lat: null, lng: null, DistMiles: null, Units: inc.Units*.Code.sort()]
+			if ( ! cleanInc.any { it.IncidentNumber == inc.MasterIncidentNumber } ) {
+				// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that out for ResponseDate. Normalize address case.
+				cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate.replaceAll('\\.[0-9]{2}-', '-'), CallType: inc.CallType.replaceFirst(/^\./, ''), IncidentTypeName: inc.IncidentTypeName, Address: toTitleCase(inc.Address), CrossStreet: toTitleCase(inc.CrossStreet), lat: null, lng: null, DistMiles: null, Units: inc.Units*.Code.sort(), UnitsTotal: inc.Units*.Code.sort()]
+			} else { 
+				log.info "Dropping duplicate incident #${inc.MasterIncidentNumber}"
+			}
 		}
 	}
 	//log.debug "size: ${incidents.size()}, clean: ${cleanInc.size()}"
@@ -243,7 +285,6 @@ List<Map> getUpdatedActiveIncidents(List<Map> allIncidents, List<Map> activeInci
 	allIncidents.each { cur ->
 		prev = activeIncidents.find { it.IncidentNumber == cur.IncidentNumber }
 		if (prev && (cur.CallType != prev.CallType || cur.Units != prev.Units || cur.Address != prev.Address || cur.CrossStreet != prev.CrossStreet)) {
-			//updatedInc << [IncidentNumber: cur.MasterIncidentNumber, ResponseDate: cur.ResponseDate, CallType: cur.CallType, IncidentTypeName: cur.IncidentTypeName, Address: cur.Address, CrossStreet: cur.CrossStreet, Units: cur.Units]
 			if (cur.Address != prev.Address || cur.CrossStreet != prev.CrossStreet) {
 				List<Float> coords
 				coords = getIncidentCoords(cur.Address, cur.CrossStreet)
@@ -255,6 +296,12 @@ List<Map> getUpdatedActiveIncidents(List<Map> allIncidents, List<Map> activeInci
 				cur.lat = prev.lat
 				cur.lng = prev.lng
 				cur.DistMiles = prev.DistMiles
+			}
+			
+			if (cur.Units != prev.Units) {
+				cur.UnitsTotal = (prev.UnitsTotal + cur.Units).sort().unique()
+			} else {
+				cur.UnitsTotal = prev.UnitsTotal
 			}
 			updatedInc << cur
 		}
@@ -275,11 +322,40 @@ List<Map> getResolvedIncidents(List<Map> allIncidents, List<Map> activeIncidents
 	}
 }
 
+String formatAddress(String address, String crossStreets, String format="") {
+	String HAIR_SPACE = '\u200A' // Unicode "Hair Space" character
+	String[] cross = []
+	String out
+	
+	if (crossStreets) {
+		cross = crossStreets.split("/")
+	}
+	if (cross.size() == 2) {
+		String[] d
+		if (format == "MIN") {
+			d = ["|-", "-|"]
+		} else {
+			d = ['╠' + HAIR_SPACE, HAIR_SPACE + '╣']
+		}
+		out = "${cross[0] ? cross[0] + d[0] : ''}${address}${cross[1] ? d[1] + cross[1] : ''}"
+	} else if (cross.size() == 1) {
+		out = "${address}${cross[0] ? ' & ' + cross[0] : ''}"
+	} else {
+		out = address
+	}
+	
+	//log.debug "new: $out"
+	//out = "${address}${crossStreets ? " | $crossStreets" : ""}"
+	//log.debug "old: $out"
+	return out
+}
+
 void logIncidents(List<Map> incidents, String LogType) {
 	List<String> listIgnoreTypes = REDUNDANT_TYPES()
 
 	String IncidentType = ""
-	String CrossStreet = ""
+	String address = ""
+	String incName = ""
 	String incDesc = ""
 	String incTime = ""
 	String incDistance = ""
@@ -287,22 +363,23 @@ void logIncidents(List<Map> incidents, String LogType) {
 	
 	incidents.each { inc ->
 		IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : " [$inc.IncidentTypeName]"
-		CrossStreet = inc.CrossStreet ? " | $inc.CrossStreet" : ""
+		address = formatAddress(inc.Address, inc.CrossStreet)
 		incDistance = inc.DistMiles ? sprintf(" (%.1f mi)", inc.DistMiles) : ""
 		url = getGMapsLink((Float)inc.lat, (Float)inc.lng)
-
+		incName = "${inc.CallType}${IncidentType}"
+		
 		if (LogType == "NEW") {
 			java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm")
 			incTime = "REC: " + df.format(toDateTime(inc.ResponseDate))
 			
-			incDesc = "${url}${inc.Address}${CrossStreet}${url ? "</a>" : ""}${incDistance}:<br>"
+			incDesc = "${url}${address}${url ? "</a>" : ""}${incDistance}:<br>"
 			inc.Units.each {
 				incDesc = incDesc + " $it"
 			}
 		} else if (LogType == "UPDATED") {
 			incTime = "UPDATED"
 			
-			incDesc = "${url}${inc.Address}${CrossStreet}${url ? "</a>" : ""}${incDistance}:<br>"
+			incDesc = "${url}${address}${url ? "</a>" : ""}${incDistance}:<br>"
 			inc.Units.each {
 				incDesc = incDesc + " $it"
 			}
@@ -311,7 +388,6 @@ void logIncidents(List<Map> incidents, String LogType) {
 			String resTime
 			
 			IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : " [$inc.IncidentTypeName]"
-			CrossStreet = inc.CrossStreet ? " | $inc.CrossStreet" : ""
 			
 			incMins = getIncidentMinutes(inc.ResponseDate)
 			// round incident time down to nearest update_interval
@@ -320,21 +396,25 @@ void logIncidents(List<Map> incidents, String LogType) {
 			// Don't log short incidents
 			if (incMins <= 20 || incMins <= update_interval*2) return
 			resTime = sprintf('%d:%02d',(Integer) Math.floor(incMins / 60), incMins % 60)
-			incTime = "RESOLVED"
+			incTime = "Inc Time: ${resTime}"
+			incName = "${incName} (RESOLVED)"
 			
-			incDesc = "${url}${inc.Address}${CrossStreet}${url ? "</a>" : ""}${incDistance}:<br>Incident time ${resTime}"
+			incDesc = "${url}${address}${url ? "</a>" : ""}${incDistance}:<br>"
+			inc.UnitsTotal.each {
+				incDesc = incDesc + " $it"
+			}
 		} else {
 			log.error "logIncidents: Invalid option: $LogType"
 		}
 		
-		sendEvent(name: "${inc.CallType}${IncidentType}", value: "$inc.IncidentNumber ($incTime)", descriptionText: incDesc) 
+		sendEvent(name: incName, value: "$inc.IncidentNumber<br><i>$incTime</i>", descriptionText: incDesc) 
 	}
 }
 
 String incidentToStr(Map<String, List> inc, String format) {
     List<String> listIgnoreTypes = REDUNDANT_TYPES()
 	String out = ""
-	String CrossStreet = inc.CrossStreet ? "|$inc.CrossStreet" : ""
+	String address = formatAddress(inc.Address, inc.CrossStreet, format)
 	String IncidentType = inc.CallType == inc.IncidentTypeName || listIgnoreTypes.any { it == inc.IncidentTypeName } ? "" : "[$inc.IncidentTypeName]"
 	String incNum = debugMode ? " ($inc.IncidentNumber)" : ""
 	String incDistance = inc.DistMiles ? sprintf(" (%.1f mi)", inc.DistMiles) : ""
@@ -349,9 +429,9 @@ String incidentToStr(Map<String, List> inc, String format) {
 		
 		String td = '<td style="border:1px solid silver;">'
 		String tdc = '</td>'
-		out = td + incTime + tdc + td + " $inc.CallType $IncidentType" + tdc + td + "${url}${inc.Address}${CrossStreet}${ url ? "</a>" : "" }${incDistance}" + tdc + td
+		out = td + incTime + tdc + td + " $inc.CallType $IncidentType" + tdc + td + "${url}${address}${ url ? "</a>" : "" }${incDistance}" + tdc + td
 	} else if (format == "MIN") {
-		out = "$inc.CallType - ${inc.Address}${CrossStreet}${incDistance}:"
+		out = "$inc.CallType - ${address}${incDistance}:"
 	} else {
 		log.error "incidentToStr: Invalid option: $format"
 	}
@@ -459,9 +539,9 @@ List<Float> getIncidentCoords(String address, String crossStreets) {
 		c = [c[0] / (Float) cCount, c[1] / (Float) cCount]
 	} else {
 		c = []
-		if ( ! (" $address $crossStreets".toUpperCase() =~ / I-[0-9]+| SR-[0-9]+| INTERSTATE [0-9]+/ ) ) {
-			log.debug sprintf("%s|%s: [%.4f, %.4f], dist: %.1f", address, crossStreets, c[0], c[1], getDistance(c, [location.latitude, location.longitude]))
-		}
+		//if ( ! (" $address $crossStreets".toUpperCase() =~ / I-[0-9]+| SR-[0-9]+| INTERSTATE [0-9]+/ ) ) {
+		//	log.debug sprintf("%s|%s: [%.4f, %.4f], dist: %.1f", address, crossStreets, c[0], c[1], getDistance(c, [location.latitude, location.longitude]))
+		//}
 	}
 	
 	return c
@@ -475,15 +555,15 @@ List<Float> getIncidentCoords(String address, String crossStreets) {
  */
 List<Float> gMapsLocationQuery(List<String> intersection) {
 	String url="https://maps.googleapis.com/maps/api/geocode/json"
-	String sdLocationComponents = "locality:San Diego|administrative_area_level_1:CA|country:US"
+	String sdLocationComponents = "locality:San Diego|administrative_area_level_1:California|country:US"
 	String queryAddr = ""
 	Map httpQuery
 	Float[] coords = [0.0, 0.0]
 	
 	if (intersection.size() == 1) {
-		queryAddr = intersection[0] + ", San Diego, CA, US"
+		queryAddr = intersection[0] //+ ", San Diego, California, US"
 	} else if (intersection.size() == 2) {
-		queryAddr = intersection[0] + " & " + intersection[1] + ", San Diego, CA, US"
+		queryAddr = intersection[0] + " & " + intersection[1] //+ ", San Diego, California, US"
 	} else {
 		return null
 	}
@@ -495,7 +575,7 @@ List<Float> gMapsLocationQuery(List<String> intersection) {
 		query: httpQuery,
 		requestContentType: "application/json",
 		contentType: "application/json",
-		timeout: 1,
+		timeout: 2,
 		ignoreSSLIssues: true
 	]
 
@@ -521,7 +601,7 @@ List<Float> gMapsLocationQuery(List<String> intersection) {
 			}
 		}
 	} catch (SocketTimeoutException e) {
-		log.error("GMaps connection timed out (timeout=${params.timeout}")
+		log.error("GMaps connection timed out (timeout=${params.timeout})")
 		return null
 	} catch (e) {
 		log.error("GMaps connection error: $e")
@@ -548,9 +628,9 @@ Float getDistance(List<Float> coorda, List<Float> coordb) {
 
 Float deg2dec(String coordDegrees) {
 	Float coordDec = 0.0
-	List tokens = coordDegrees.tokenize('°\'"')
+	List tokens = coordDegrees.toUpperCase().tokenize('°\'"')
 	coordDec = Float.parseFloat(tokens[0]) + Float.parseFloat(tokens[1])/60 + Float.parseFloat(tokens[2])/3600
-	if (tokens[3] == "w" || tokens[3] == "s" ) coordDec = -coordDec
+	if (tokens[3] == "W" || tokens[3] == "S") coordDec = -coordDec
 	return coordDec
 }
 
