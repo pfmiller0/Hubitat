@@ -64,19 +64,21 @@ def initialize() {
 }
 
 void toggleLights(evt) {
-	if (light.latestValue("switch") == "off" || motionActive?.latestValue("switch") == "on") {
+	if (light.latestValue("switch") == "off") {
 		light.on()
-	} else {
+  	} else if (motionActive?.latestValue("switch") == "on") {
+		raiseLights(evt)
+    } else {
 		light.off()
 	}
-	if ( motionActive ) motionActive.off()
 }
 
 void raiseLights(evt) {
 	if (light.latestValue("switch") == "off" ||
 		light.latestValue("level") <= lightRaisePrimaryLevel - 3 ||
 		light.latestValue("level") >= lightRaisePrimaryLevel + 3 ||
-		motionActive?.latestValue("switch") == "on") {		
+		motionActive?.latestValue("switch") == "on") {
+		
 		light.setColorTemperature(lightRaisePrimaryTemp, lightRaisePrimaryLevel)
 	} else {
 		light.setColorTemperature(lightRaiseSecTemp, lightRaiseSecLevel)
