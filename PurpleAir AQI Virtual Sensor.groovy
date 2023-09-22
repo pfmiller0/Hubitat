@@ -5,7 +5,7 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 
-public static String version() { return "1.1.4" }
+public static String version() { return "1.1.5" }
 
 metadata {
 	definition (
@@ -17,10 +17,12 @@ metadata {
 	{
 		capability "Sensor"
 		capability "Polling"
+		capability "Initialize"
 
 		attribute "aqi", "number"
 		attribute "category", "string" // Description of current air quality
 		attribute "sites", "string" // List of sensor sites used
+		
 		command "refresh"
 	}
 
@@ -84,6 +86,10 @@ def configure() {
 		log.error "Invalid update_interval"
 		runEvery1Hour('refresh')
 	}
+}
+
+def initialize() {
+	configure()
 }
 
 def updated() {
