@@ -5,7 +5,7 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 
-public static String version() { return "1.1.2" }
+public static String version() { return "1.1.3" }
 
 metadata {
 	definition (
@@ -151,25 +151,33 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		return
 	}
 	/*** Test backoff on error ***
-	if (resp.getStatus() != 200 ) {	
-        state.failCount++
+	String respMimetype = ''
+	if (resp.getHeaders() && resp.getHeaders()["Content-Type"]) {
+		respMimetype = resp.getHeaders()["Content-Type"].split(";")[0]
+	}
+
+	if (resp.getStatus() != 200 || respMimetype != "application/json" ) {
+		if (respMimetype != "application/json" ) {
+			log.error "Response type '${respMimetype}', JSON expected"
+		}
+		state.failCount++
 		unschedule('refresh')
 		if (state.failCount <= 4 ) {
-            log.error "HTTP error from PurpleAir: " + resp.getStatus()
+			log.error "HTTP error from PurpleAir: " + resp.getStatus()
 			runIn(Integer.valueOf(update_interval) * state.failCount * 60, 'refresh')
 		} else if (state.failCount == 5 ) {
-            log.error "HTTP error from PurpleAir: " + resp.getStatus() + " (muting errors)"
+			log.error "HTTP error from PurpleAir: " + resp.getStatus() + " (muting errors)"
 			runIn(Integer.valueOf(update_interval * state.failCount) * 60, 'refresh')
 		} else {
 			runIn(Integer.valueOf(update_interval) * 6 * 60, 'refresh')
 		}
 		return
 	} else {
-        if (state.failCount > 0 ) {
+		if (state.failCount > 0 ) {
 			if (state.failCount >= 5 ) {
 				log.info "HTTP error from PurpleAir resolved ($state.failCount)"
-            }
-            state.failCount = 0
+			}
+			state.failCount = 0
 			configure()
 		}
 	}
@@ -182,6 +190,12 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		// Filter out lower quality devices
 		//sensorData = resp.getJson().data.findAll {it[RESPONSE_FIELDS["confidence"]] >= (confidenceThreshold as Integer) }
 		sensorData = resp.getJson().data.findAll {it[RESPONSE_FIELDS["confidence"]] >= 90}
+		if ( debugMode ) {
+			def dropped = resp.getJson().data.findAll {it[RESPONSE_FIELDS["confidence"]] < 90}
+			if ( dropped ) {
+				log.debug "Low confidence sensors dropped: ${dropped}"
+			}
+		}
 	} else {
 		sensorData = resp.getJson().data
 	}
@@ -252,6 +266,7 @@ Float sensorAverageWeighted(List<Map> sensors, String field, Float[] coords) {
 	Float count = 0.0
 	Float sum = 0.0
 	ArrayList distances = []
+	// ArrayList weights = []
 	Float nearest = 0.0
 	
 	// Weighted average. First find nearest sensor. Then divide sensors distances by nearest distance to get weights.
@@ -261,11 +276,16 @@ Float sensorAverageWeighted(List<Map> sensors, String field, Float[] coords) {
 	nearest = distances.min()
 	
 	sensors.eachWithIndex { it, i ->
-	   	Float val = it[field]
-	   	Float weight = nearest / distances[i]
+		Float val = it[field]
+		Float weight = nearest / Math.sqrt(distances[i])
+		// Float weight = nearest / distances[i]
+		// if ( debugMode ) log.debug "weight=nearest/distance : ${weight} = ${nearest} / ${distances[i]}"
+		// if ( debugMode ) weights.add(weight)
 		sum = sum + val * weight
-	   	count = count + weight
+		count = count + weight
 	}
+	// if ( debugMode ) log.debug "weights: ${weights}"
+	// if ( debugMode ) log.debug "distances: ${distances}"
 	return sum / count
 }
 
