@@ -5,7 +5,7 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 
-public static String version() { return "1.1.3" }
+public static String version() { return "1.1.4" }
 
 metadata {
 	definition (
@@ -38,7 +38,7 @@ metadata {
 			//input "confidenceThreshold", "number", title: "Confidence threshold", required: true, description: "Filter out measurments below this confidence", range: "0..100", defaultValue: 90
 		} else {
 			input "Read_Key", "text", title: "Private key", required: false, description: "Required to access private devices"
-			input "sensor_index", "number", title: "Sensor index", required: true, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com", defaultValue: 90905
+			input "sensor_index", "number", title: "Sensor index", required: true, description: "Select=INDEX in URL when viewing a sensor on map.purpleair.com", defaultValue: 82101
 		}
 		input "debugMode", "bool", title: "Debug logging", required: true, defaultValue: false
 	}
