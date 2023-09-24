@@ -5,7 +5,7 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 
-public static String version() { return "1.1.5" }
+public static String version() { return "1.2.0" }
 
 metadata {
 	definition (
@@ -20,16 +20,20 @@ metadata {
 		capability "Initialize"
 
 		attribute "aqi", "number"
+		attribute "conversion", "string" // Conversion algorithm
 		attribute "category", "string" // Description of current air quality
 		attribute "sites", "string" // List of sensor sites used
-		
+
 		command "refresh"
 	}
 
 	preferences {
 		input "X_API_Key", "text", title: "PurpleAir API key", required: true, description: "Contact contact@purpleair.com to request an API key"
 		input "update_interval", "enum", title: "Update interval", required: true, options: [["1": "1 min"], ["5": "5 min"], ["10": "10 min"], ["15": "15 min"], ["30": "30 min"], ["60": "1 hr"], ["180": "3 hr"]], defaultValue: "60"
-		input "avg_period", "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: [["pm2.5":"1 min"], ["pm2.5_10minute":"10 mins"], ["pm2.5_30minute":"30 mins"], ["pm2.5_60minute":"1 hour"], ["pm2.5_6hour":"6 hours"], ["pm2.5_24hour":"1 day"], ["pm2.5_1week":"1 week"]], defaultValue: "pm2.5_60minute"
+		input "conversion", "enum", title: "Apply conversion", required: true, description: "See map.purpleair.com for details", options: ["none", "US EPA", "Woodsmoke", "AQ and U", "LRAPA"], defaultValue: "none"
+		if (! conversion || conversion == "none") {
+			input "avg_period", "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: [["pm2.5": "1 min"], ["pm2.5_10minute": "10 mins"], ["pm2.5_30minute": "30 mins"], ["pm2.5_60minute": "1 hour"], ["pm2.5_6hour": "6 hours"], ["pm2.5_24hour": "1 day"], ["pm2.5_1week": "1 week"]], defaultValue: "pm2.5_60minute"
+		}
 		input "device_search", "bool", title: "Search for devices", required: true, description: "If false specify device index to use", defaultValue: true
 
 		if ( device_search ) {
@@ -67,7 +71,11 @@ def configure() {
 	unschedule()
 
 	//state.failCount = state.failCount ?: 0
-		
+	
+	if (! conversion || conversion == "none") {
+		device.deleteCurrentState('conversion')
+	}
+
 	if ( update_interval == "1" ) {
 		schedule('0 */1 * ? * *', 'refresh')
 	} else if ( update_interval == "5" ) {
@@ -102,7 +110,12 @@ def uninstalled() {
 
 void sensorCheck() {
 	String url="https://api.purpleair.com/v1/sensors"
-	String query_fields="name,${avg_period},latitude,longitude,confidence"
+	String particles = avg_period
+	if (! conversion || conversion == "none") {
+		particles = "pm2.5"
+	}
+		
+	String query_fields="name,${particles},latitude,longitude,confidence,pm2.5_alt,pm2.5_cf_1,humidity"
 	Map httpQuery
 	Float[] coords
 	
@@ -136,7 +149,7 @@ void sensorCheck() {
 	]
 
 	try {
-		asynchttpGet('httpResponse', params, [coords: coords])
+		asynchttpGet('httpResponse', params, [coords: coords, particles: particles])
 	} catch (SocketTimeoutException e) {
 		log.error("Connection to PurpleAir timed out.")
 	} catch (Exception e) {
@@ -208,14 +221,20 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 
 	// initialize sensor maps
 	Float[] sensor_coords
+	Float part_count_conv
 	sensorData.each {
 		sensor_coords = [Float.valueOf(it[RESPONSE_FIELDS['latitude']]), Float.valueOf(it[RESPONSE_FIELDS['longitude']])]
+		part_count_conv = apply_conversion(conversion?:"none", Float.valueOf(it[RESPONSE_FIELDS[data.particles]]), Float.valueOf(it[RESPONSE_FIELDS['pm2.5_cf_1']]), Float.valueOf(it[RESPONSE_FIELDS['humidity']]))
 		sensors << [
 			'site': it[RESPONSE_FIELDS['name']],
-			'part_count': Float.parseFloat(it[RESPONSE_FIELDS[avg_period]]),
-			'confidence': Integer.parseInt(it[RESPONSE_FIELDS['confidence']]),
+			'part_count': Float.valueOf(it[RESPONSE_FIELDS[data.particles]]),
+			'part_count_conv': part_count_conv,
+			'confidence': Integer.valueOf(it[RESPONSE_FIELDS['confidence']]),
 			'distance': distance(data.coords, sensor_coords),
-			'coords': sensor_coords
+			'coords': sensor_coords,
+			'part_count_alt': Float.valueOf(it[RESPONSE_FIELDS['pm2.5_alt']]),
+			'part_count_cf_1': Float.valueOf(it[RESPONSE_FIELDS['pm2.5_cf_1']]),
+			'humidity': Float.valueOf(it[RESPONSE_FIELDS['humidity']])
 		]
 	}
 
@@ -223,8 +242,10 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		log.debug "coords: ${data.coords}"
 		log.debug "site: ${sensors.collect { it['site'] }}"
 		log.debug "part_count: ${sensors.collect { it['part_count'] }}"
+		log.debug "part_count_conv: ${sensors.collect { it['part_count_conv'] }}"
 		log.debug "confidence: ${sensors.collect { it['confidence'] }}"
 		log.debug "AQIs: ${sensors.collect { getPart2_5_AQI(it['part_count']) }}"
+		log.debug "AQIs (${conversion}): ${sensors.collect { getPart2_5_AQI(it['part_count_conv']) }}"
 		log.debug "distance: ${sensors.collect { it['distance'] }}"
 		log.debug "unweighted av aqi: ${getPart2_5_AQI(sensorAverage(sensors, 'part_count'))}"
 		if ( weighted_avg && device_search ) {
@@ -232,10 +253,18 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		}
 	}
 
-	if ( weighted_avg && device_search) {
-		aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensors, 'part_count', data.coords))
+	if (conversion && conversion == "none") {
+		if ( weighted_avg && device_search) {
+			aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensors, 'part_count', data.coords))
+		} else {
+			aqiValue = getPart2_5_AQI(sensorAverage(sensors, 'part_count'))
+		}
 	} else {
-		aqiValue = getPart2_5_AQI(sensorAverage(sensors, 'part_count'))
+		if ( weighted_avg && device_search) {
+			aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensors, 'part_count_conv', data.coords))
+		} else {
+			aqiValue = getPart2_5_AQI(sensorAverage(sensors, 'part_count_conv'))
+		}
 	}
 	
 	AQIcategory = getCategory(aqiValue)
@@ -252,8 +281,14 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 			sendEvent(name: "sites", value: sites, descriptionText: "AQI is averaged from ${sensors.size()} sites ${sites}")
 		}
 		sendEvent(name: "category", value: AQIcategory, descriptionText: "${device.displayName} category is ${AQIcategory}")
-		//sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${device.displayName} AQI level is ${aqiValue}")
-		sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${AQIcategory}")
+		if (conversion && conversion != "none") {
+			sendEvent(name: "conversion", value: conversion, descriptionText: "AQI conversion algorithm is ${conversion}")
+			//sendEvent(name: "aqi", value: aqiValue, unit: "AQI (${conversion})", descriptionText: "${device.displayName} AQI level is ${aqiValue}")
+			sendEvent(name: "aqi", value: aqiValue, unit: "AQI (${conversion})", descriptionText: "${AQIcategory}")
+		} else {
+			//sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${device.displayName} AQI level is ${aqiValue}")
+			sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${AQIcategory}")
+		}
 	}
 }
 
@@ -345,6 +380,73 @@ String getCategory(Integer AQI) {
 		return "error"
 	}
 }
+
+Float apply_conversion(String conversion, Float PM25, Float PM25_cf_1, Float RH) {
+	if ( conversion == "US EPA" ) {
+		return us_epa_conversion(PM25, RH)
+	} else if ( conversion == "Woodsmoke" ) {
+		return woodsmoke_conversion(PM25_cf_1)
+	} else if ( conversion == "AQ and U" ) {
+		return AQandU_conversion(PM25)
+	} else if ( conversion == "LRAPA" ) {
+		return lrapa_conversion(PM25_cf_1)
+	} else {
+		return PM25
+	}
+}
+
+Float us_epa_conversion(Float PM, Float RH) {
+	// y={0 ≤ x <30: 0.524*x - 0.0862*RH + 5.75}
+	// y={30≤ x <50: (0.786*(x/20 - 3/2) + 0.524*(1 - (x/20 - 3/2)))*x -0.0862*RH + 5.75}
+	// y={50 ≤ x <210: 0.786*x - 0.0862*RH + 5.75}
+	// y={210 ≤ x <260: (0.69*(x/50 – 21/5) + 0.786*(1 - (x/50 – 21/5)))*x - 0.0862*RH*(1 - (x/50 – 21/5)) + 2.966*(x/50 – 21/5) + 5.75*(1 - (x/50 – 21/5)) + 8.84*(10^{-4})*x^{2}*(x/50 – 21/5)}
+	// y={260 ≤ x: 2.966 + 0.69*x + 8.84*10^{-4}*x^2}
+	//
+	// y= corrected PM2.5 µg/m3
+	// x= PM2.5 cf_atm (lower)
+	// RH= Relative humidity as measured by the PurpleAir
+	//
+	// Source: https://cfpub.epa.gov/si/si_public_record_report.cfm?dirEntryId=353088&Lab=CEMM
+	// PDF, p26
+	if ( PM < 30 ) {
+		return 0.524 * PM - 0.0862 * RH + 5.75
+	} else if ( PM < 50 ) {
+		return (0.786 * (PM/20 - 3/2) + 0.524 * (1 - (PM/20 - 3/2))) * PM -0.0862 * RH + 5.75
+	} else if ( PM < 210 ) {
+		return 0.786 * PM - 0.0862 * RH + 5.75
+	} else if ( PM < 260 ) {
+		Float y = 0.69*(PM/50 - 21/5) + 0.786*(1 - (PM/50 - 21/5))
+		y = y*PM - 0.0862*RH * (1 - (PM/50 - 21/5))
+		y = y + 2.966*(PM/50 - 21/5) + 5.75*(1 - (PM/50 - 21/5))
+		y = y + 8.84*(10**(-4))*PM**2*(PM/50 - 21/5)
+		return y
+	} else {
+		return 2.966 + 0.69*x + 8.84*(10**(-4))*(PM**2)
+	}
+}
+
+Float woodsmoke_conversion(Float PM) {
+	// Woodsmoke PM2.5 (µg/m³) = 0.55 x PA (pm2.5_cf_1) + 0.53
+	// Source: map.purpleair.com
+	return 0.55 * PM + 0.53
+}
+
+Float AQandU_conversion(Float PM) {
+	// PM2.5 (µg/m³) = 0.778 x PA + 2.65
+	// Source: map.purpleair.com
+	return 0.778 * PM + 2.65
+}
+
+Float lrapa_conversion(Float PM) {
+	// 0 - 65 µg/m³ range:
+	// LRAPA PM2.5 (µg/m³) = 0.5 x PA (pm2.5_cf_1) – 0.66
+	// Source: map.purpleair.com
+	//
+	// Deprecated? per https://www.lrapa.org/aqi101/
+	return 0.5 * PM - 0.66
+}
+
+// PM_ALT ("pm2.5_alt", availble from api)
 
 Float distance(Float[] coorda, Float[] coordb) {
 	if ( coorda == null || coordb == null ) return 0.0
