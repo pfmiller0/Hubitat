@@ -5,7 +5,7 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 
-public static String version() { return "1.2.0" }
+public static String version() { return "1.2.1" }
 
 metadata {
 	definition (
@@ -30,7 +30,7 @@ metadata {
 	preferences {
 		input "X_API_Key", "text", title: "PurpleAir API key", required: true, description: "Contact contact@purpleair.com to request an API key"
 		input "update_interval", "enum", title: "Update interval", required: true, options: [["1": "1 min"], ["5": "5 min"], ["10": "10 min"], ["15": "15 min"], ["30": "30 min"], ["60": "1 hr"], ["180": "3 hr"]], defaultValue: "60"
-		input "conversion", "enum", title: "Apply conversion", required: true, description: "See map.purpleair.com for details", options: ["none", "US EPA", "Woodsmoke", "AQ&U", "LRAPA"], defaultValue: "none"
+		input "conversion", "enum", title: "Apply conversion", required: false, description: "See map.purpleair.com for details", options: ["US EPA", "Woodsmoke", "AQ&U", "LRAPA"]
 		if (! conversion || conversion == "none") {
 			input "avg_period", "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: [["pm2.5": "1 min"], ["pm2.5_10minute": "10 mins"], ["pm2.5_30minute": "30 mins"], ["pm2.5_60minute": "1 hour"], ["pm2.5_6hour": "6 hours"], ["pm2.5_24hour": "1 day"], ["pm2.5_1week": "1 week"]], defaultValue: "pm2.5_60minute"
 		}
