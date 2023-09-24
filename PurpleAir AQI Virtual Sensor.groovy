@@ -5,7 +5,7 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 
-public static String version() { return "1.2.1" }
+public static String version() { return "1.2.2" }
 
 metadata {
 	definition (
@@ -31,7 +31,7 @@ metadata {
 		input "X_API_Key", "text", title: "PurpleAir API key", required: true, description: "Contact contact@purpleair.com to request an API key"
 		input "update_interval", "enum", title: "Update interval", required: true, options: [["1": "1 min"], ["5": "5 min"], ["10": "10 min"], ["15": "15 min"], ["30": "30 min"], ["60": "1 hr"], ["180": "3 hr"]], defaultValue: "60"
 		input "conversion", "enum", title: "Apply conversion", required: false, description: "See map.purpleair.com for details", options: ["US EPA", "Woodsmoke", "AQ&U", "LRAPA"]
-		if (! conversion || conversion == "none") {
+		if (! conversion) {
 			input "avg_period", "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: [["pm2.5": "1 min"], ["pm2.5_10minute": "10 mins"], ["pm2.5_30minute": "30 mins"], ["pm2.5_60minute": "1 hour"], ["pm2.5_6hour": "6 hours"], ["pm2.5_24hour": "1 day"], ["pm2.5_1week": "1 week"]], defaultValue: "pm2.5_60minute"
 		}
 		input "device_search", "bool", title: "Search for devices", required: true, description: "If false specify device index to use", defaultValue: true
@@ -72,7 +72,7 @@ def configure() {
 
 	//state.failCount = state.failCount ?: 0
 	
-	if (! conversion || conversion == "none") {
+	if (! conversion) {
 		device.deleteCurrentState('conversion')
 	}
 
@@ -111,7 +111,7 @@ def uninstalled() {
 void sensorCheck() {
 	String url="https://api.purpleair.com/v1/sensors"
 	String particles = avg_period
-	if (! conversion || conversion == "none") {
+	if (conversion) {
 		particles = "pm2.5"
 	}
 		
@@ -245,7 +245,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		log.debug "part_count_conv: ${sensors.collect { it['part_count_conv'] }}"
 		log.debug "confidence: ${sensors.collect { it['confidence'] }}"
 		log.debug "AQIs: ${sensors.collect { getPart2_5_AQI(it['part_count']) }}"
-		log.debug "AQIs (${conversion}): ${sensors.collect { getPart2_5_AQI(it['part_count_conv']) }}"
+		log.debug "AQIs (${conversion?:"none"}): ${sensors.collect { getPart2_5_AQI(it['part_count_conv']) }}"
 		log.debug "distance: ${sensors.collect { it['distance'] }}"
 		log.debug "unweighted av aqi: ${getPart2_5_AQI(sensorAverage(sensors, 'part_count'))}"
 		if ( weighted_avg && device_search ) {
@@ -253,7 +253,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		}
 	}
 
-	if (conversion && conversion == "none") {
+	if (! conversion) {
 		if ( weighted_avg && device_search) {
 			aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensors, 'part_count', data.coords))
 		} else {
@@ -281,7 +281,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 			sendEvent(name: "sites", value: sites, descriptionText: "AQI is averaged from ${sensors.size()} sites ${sites}")
 		}
 		sendEvent(name: "category", value: AQIcategory, descriptionText: "${device.displayName} category is ${AQIcategory}")
-		if (conversion && conversion != "none") {
+		if (conversion) {
 			sendEvent(name: "conversion", value: conversion, descriptionText: "AQI conversion algorithm is ${conversion}")
 			//sendEvent(name: "aqi", value: aqiValue, unit: "AQI (${conversion})", descriptionText: "${device.displayName} AQI level is ${aqiValue}")
 			sendEvent(name: "aqi", value: aqiValue, unit: "AQI (${conversion})", descriptionText: "${AQIcategory}")
