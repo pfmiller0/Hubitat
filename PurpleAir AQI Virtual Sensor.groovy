@@ -5,7 +5,7 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 
-public static String version() { return "1.2.2" }
+public static String version() { return "1.2.3" }
 
 metadata {
 	definition (
@@ -69,8 +69,6 @@ def poll() {
 
 def configure() {
 	unschedule()
-
-	//state.failCount = state.failCount ?: 0
 	
 	if (! conversion) {
 		device.deleteCurrentState('conversion')
@@ -179,7 +177,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		if (respMimetype != "application/json" ) {
 			log.error "Response type '${respMimetype}', JSON expected"
 		}
-		state.failCount++
+		state.failCount = state.failCount?:0 + 1
 		unschedule('refresh')
 		if (state.failCount <= 4 ) {
 			log.error "HTTP error from PurpleAir: " + resp.getStatus()
@@ -218,13 +216,25 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	} else {
 		sensorData = resp.getJson().data
 	}
+	
+	// Some sensors don't return humidity, fill in missing data with avg from other devices
+	Float avg_humidity = sensorAverage(sensorData.collect {['humidity': Float.valueOf(it[RESPONSE_FIELDS['humidity']]?:0)]}, 'humidity')
+	if (avg_humidity == null) {
+		if (conversion == "US EPA") {
+			log.error 'No humidity returned from sites and "US EPA" conversion selected. US EPA requires humidity data, please choose another option!'
+			return
+		} else {
+			log.debug "humidity null, but not required. setting to 0"
+			avg_humidity = 0.0
+		}
+	}
 
 	// initialize sensor maps
 	Float[] sensor_coords
 	Float part_count_conv
 	sensorData.each {
 		sensor_coords = [Float.valueOf(it[RESPONSE_FIELDS['latitude']]), Float.valueOf(it[RESPONSE_FIELDS['longitude']])]
-		part_count_conv = apply_conversion(conversion?:"none", Float.valueOf(it[RESPONSE_FIELDS[data.particles]]), Float.valueOf(it[RESPONSE_FIELDS['pm2.5_cf_1']]), Float.valueOf(it[RESPONSE_FIELDS['humidity']]))
+		part_count_conv = apply_conversion(conversion?:"none", Float.valueOf(it[RESPONSE_FIELDS[data.particles]]), Float.valueOf(it[RESPONSE_FIELDS['pm2.5_cf_1']]), Float.valueOf(it[RESPONSE_FIELDS['humidity']]?:avg_humidity))
 		sensors << [
 			'site': it[RESPONSE_FIELDS['name']],
 			'part_count': Float.valueOf(it[RESPONSE_FIELDS[data.particles]]),
@@ -234,22 +244,23 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 			'coords': sensor_coords,
 			'part_count_alt': Float.valueOf(it[RESPONSE_FIELDS['pm2.5_alt']]),
 			'part_count_cf_1': Float.valueOf(it[RESPONSE_FIELDS['pm2.5_cf_1']]),
-			'humidity': Float.valueOf(it[RESPONSE_FIELDS['humidity']])
+			'humidity': Float.valueOf(it[RESPONSE_FIELDS['humidity']]?:avg_humidity)
 		]
 	}
-
 	if ( debugMode ) {
 		log.debug "coords: ${data.coords}"
 		log.debug "site: ${sensors.collect { it['site'] }}"
+		log.debug "particle ct query: ${data.particles}"
 		log.debug "part_count: ${sensors.collect { it['part_count'] }}"
 		log.debug "part_count_conv: ${sensors.collect { it['part_count_conv'] }}"
 		log.debug "confidence: ${sensors.collect { it['confidence'] }}"
+		log.debug "humidity: ${sensors.collect { it['humidity'] }}"
 		log.debug "AQIs: ${sensors.collect { getPart2_5_AQI(it['part_count']) }}"
 		log.debug "AQIs (${conversion?:"none"}): ${sensors.collect { getPart2_5_AQI(it['part_count_conv']) }}"
 		log.debug "distance: ${sensors.collect { it['distance'] }}"
-		log.debug "unweighted av aqi: ${getPart2_5_AQI(sensorAverage(sensors, 'part_count'))}"
-		if ( weighted_avg && device_search ) {
-			log.debug "weighted av aqi: ${getPart2_5_AQI(sensorAverageWeighted(sensors, 'part_count', data.coords))}"
+		if ( device_search ) {
+			log.debug "unweighted av aqi (${conversion?:"none"}): ${getPart2_5_AQI(sensorAverage(sensors, 'part_count_conv'))}"
+			log.debug "weighted av aqi (${conversion?:"none"}): ${getPart2_5_AQI(sensorAverageWeighted(sensors, 'part_count_conv', data.coords))}"
 		}
 	}
 
@@ -297,10 +308,17 @@ Float sensorAverage(List<Map> sensors, String field) {
 	Float sum = 0
     
 	sensors.each {
-		sum = sum + it[field]
-		count = count + 1
+		if (it[field]) {
+			sum = sum + it[field]
+			count = count + 1
+		}
 	}
-	return sum / count
+
+	if (sum > 0) {
+		return sum / count
+	} else {
+		return null
+	}
 }
 
 Float sensorAverageWeighted(List<Map> sensors, String field, Float[] coords) {
@@ -354,10 +372,7 @@ Integer getPart2_5_AQI(Float partCount) {
 }
 
 Integer AQILinear(Integer AQIhigh, Integer AQIlow, Float Conchigh, Float Conclow, Float Concentration) {
-	Float a
-	
-	a=((Concentration-Conclow)/(Conchigh-Conclow))*(AQIhigh-AQIlow)+AQIlow;
-	
+	Float a = ((Concentration-Conclow)/(Conchigh-Conclow))*(AQIhigh-AQIlow)+AQIlow
 	return Math.round(a)
 }
 
