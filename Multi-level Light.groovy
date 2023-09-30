@@ -20,10 +20,15 @@ preferences {
 	section() {
 		input "isPaused", "bool", title: "Pause app", defaultValue: false
 	}
-    section("<b>Devices</b>") {
+	section("<b>Devices</b>") {
     	input "light", "capability.colorTemperature", title: "Light", multiple: false
 		input "button", "capability.pushableButton", title: "Button", multiple: false
-		input "handleToggle", "bool", title: "Handle single press (toggle)"
+	}
+	section("<b>Preferences</b>") {
+		input "handleToggle", "bool", title: "Handle single press (toggle on/off)"
+		if (handleToggle) {
+			input "resetLightWithOn", "bool", title: "Reset light when light is turned on"
+		}
 	}
 	section("<b>Light levels</b>") {
 		input "lightRaisePrimaryTemp", "number", title: "Raised primary temperature", width: 4, range: "1500..9000", defaultValue: 3500
@@ -64,21 +69,26 @@ def initialize() {
 }
 
 void toggleLights(evt) {
-	if (light.latestValue("switch") == "off") {
-		light.on()
-  	} else if (motionActive?.latestValue("switch") == "on") {
-		raiseLights(evt)
-    } else {
+	if (light.latestValue("switch") == "off" || motionActive?.latestValue("switch") == "on") {
+		if (resetLightWithOn) {
+			light.setColorTemperature(lightRaisePrimaryTemp, lightRaisePrimaryLevel)
+		} else {
+			light.on()
+		}
+	} else {
 		light.off()
 	}
 }
 
 void raiseLights(evt) {
-	if (light.latestValue("switch") == "off" ||
-		light.latestValue("level") <= lightRaisePrimaryLevel - 3 ||
-		light.latestValue("level") >= lightRaisePrimaryLevel + 3 ||
-		motionActive?.latestValue("switch") == "on") {
-		
+	if (light.latestValue("switch") == "off" || motionActive?.latestValue("switch") == "on") {
+		if ( handleToggle && resetLightWithOn ) {
+			light.setColorTemperature(lightRaiseSecTemp, lightRaiseSecLevel)
+		} else {
+			light.setColorTemperature(lightRaisePrimaryTemp, lightRaisePrimaryLevel)
+		}
+	} else if (light.latestValue("level") <= lightRaisePrimaryLevel - 3 ||
+	           light.latestValue("level") >= lightRaisePrimaryLevel + 3) {
 		light.setColorTemperature(lightRaisePrimaryTemp, lightRaisePrimaryLevel)
 	} else {
 		light.setColorTemperature(lightRaiseSecTemp, lightRaiseSecLevel)
@@ -88,10 +98,10 @@ void raiseLights(evt) {
 
 void lowerLights(evt) {
 	if (light.latestValue("switch") == "off" ||
+		motionActive?.latestValue("switch") == "on" ||
 		light.latestValue("level") <= lightLowerPrimaryLevel - 3 ||
-		light.latestValue("level") >= lightLowerPrimaryLevel + 3 ||
-		motionActive?.latestValue("switch") == "on") {
-		
+		light.latestValue("level") >= lightLowerPrimaryLevel + 3)
+	{
 		light.setColorTemperature(lightLowerPrimaryTemp, lightLowerPrimaryLevel)
 	} else {
 		light.setColorTemperature(lightLowerSecTemp, lightLowerSecLevel)
