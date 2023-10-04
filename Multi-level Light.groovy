@@ -28,6 +28,8 @@ preferences {
 		input "handleToggle", "bool", title: "Handle single press (toggle on/off)"
 		if (handleToggle) {
 			input "resetLightWithOn", "bool", title: "Reset light when light is turned on"
+		} else {
+			input "turnOnToRaisedWithHold", "bool", title: "Go to raised level when turned on with long press"
 		}
 	}
 	section("<b>Light levels</b>") {
@@ -82,7 +84,7 @@ void toggleLights(evt) {
 
 void raiseLights(evt) {
 	if (light.latestValue("switch") == "off" || motionActive?.latestValue("switch") == "on") {
-		if ( handleToggle && resetLightWithOn ) {
+		if ( (handleToggle && resetLightWithOn) || (!handleToggle && turnOnToRaisedWithHold) ) {
 			light.setColorTemperature(lightRaiseSecTemp, lightRaiseSecLevel)
 		} else {
 			light.setColorTemperature(lightRaisePrimaryTemp, lightRaisePrimaryLevel)
@@ -107,4 +109,3 @@ void lowerLights(evt) {
 		light.setColorTemperature(lightLowerSecTemp, lightLowerSecLevel)
 	}
 	if ( motionActive ) motionActive.off()
-}
