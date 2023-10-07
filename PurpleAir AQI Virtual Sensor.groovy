@@ -231,19 +231,19 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 
 	// initialize sensor maps
 	Float[] sensor_coords
-	Float part_count_conv
+	Float pm2_5_conv
 	sensorData.each {
 		sensor_coords = [Float.valueOf(it[RESPONSE_FIELDS['latitude']]), Float.valueOf(it[RESPONSE_FIELDS['longitude']])]
 		part_count_conv = apply_conversion(conversion?:"none", Float.valueOf(it[RESPONSE_FIELDS[data.particles]]), Float.valueOf(it[RESPONSE_FIELDS['pm2.5_cf_1']]), Float.valueOf(it[RESPONSE_FIELDS['humidity']]?:avg_humidity))
 		sensors << [
 			'site': it[RESPONSE_FIELDS['name']],
-			'part_count': Float.valueOf(it[RESPONSE_FIELDS[data.particles]]),
-			'part_count_conv': part_count_conv,
+			'pm2_5': Float.valueOf(it[RESPONSE_FIELDS[data.particles]]),
+			'pm2_5_conv': part_count_conv,
 			'confidence': Integer.valueOf(it[RESPONSE_FIELDS['confidence']]),
 			'distance': distance(data.coords, sensor_coords),
 			'coords': sensor_coords,
-			'part_count_alt': Float.valueOf(it[RESPONSE_FIELDS['pm2.5_alt']]),
-			'part_count_cf_1': Float.valueOf(it[RESPONSE_FIELDS['pm2.5_cf_1']]),
+			'pm2_5_alt': Float.valueOf(it[RESPONSE_FIELDS['pm2.5_alt']]),
+			'pm2_5_cf_1': Float.valueOf(it[RESPONSE_FIELDS['pm2.5_cf_1']]),
 			'humidity': Float.valueOf(it[RESPONSE_FIELDS['humidity']]?:avg_humidity)
 		]
 	}
@@ -251,30 +251,30 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		log.debug "coords: ${data.coords}"
 		log.debug "site: ${sensors.collect { it['site'] }}"
 		log.debug "particle ct query: ${data.particles}"
-		log.debug "part_count: ${sensors.collect { it['part_count'] }}"
-		log.debug "part_count_conv: ${sensors.collect { it['part_count_conv'] }}"
+		log.debug "pm2_5: ${sensors.collect { it['pm2_5'] }}"
+		log.debug "pm2_5_conv: ${sensors.collect { it['pm2_5_conv'] }}"
 		log.debug "confidence: ${sensors.collect { it['confidence'] }}"
 		log.debug "humidity: ${sensors.collect { it['humidity'] }}"
-		log.debug "AQIs: ${sensors.collect { getPart2_5_AQI(it['part_count']) }}"
-		log.debug "AQIs (${conversion?:"none"}): ${sensors.collect { getPart2_5_AQI(it['part_count_conv']) }}"
+		log.debug "AQIs: ${sensors.collect { getPart2_5_AQI(it['pm2_5']) }}"
+		log.debug "AQIs (${conversion?:"none"}): ${sensors.collect { getPart2_5_AQI(it['pm2_5_conv']) }}"
 		log.debug "distance: ${sensors.collect { it['distance'] }}"
 		if ( device_search ) {
-			log.debug "unweighted av aqi (${conversion?:"none"}): ${getPart2_5_AQI(sensorAverage(sensors, 'part_count_conv'))}"
-			log.debug "weighted av aqi (${conversion?:"none"}): ${getPart2_5_AQI(sensorAverageWeighted(sensors, 'part_count_conv', data.coords))}"
+			log.debug "unweighted av aqi (${conversion?:"none"}): ${getPart2_5_AQI(sensorAverage(sensors, 'pm2_5_conv'))}"
+			log.debug "weighted av aqi (${conversion?:"none"}): ${getPart2_5_AQI(sensorAverageWeighted(sensors, 'pm2_5_conv', data.coords))}"
 		}
 	}
 
 	if (! conversion) {
 		if ( weighted_avg && device_search) {
-			aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensors, 'part_count', data.coords))
+			aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensors, 'pm2_5', data.coords))
 		} else {
-			aqiValue = getPart2_5_AQI(sensorAverage(sensors, 'part_count'))
+			aqiValue = getPart2_5_AQI(sensorAverage(sensors, 'pm2_5'))
 		}
 	} else {
 		if ( weighted_avg && device_search) {
-			aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensors, 'part_count_conv', data.coords))
+			aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensors, 'pm2_5_conv', data.coords))
 		} else {
-			aqiValue = getPart2_5_AQI(sensorAverage(sensors, 'part_count_conv'))
+			aqiValue = getPart2_5_AQI(sensorAverage(sensors, 'pm2_5_conv'))
 		}
 	}
 	
