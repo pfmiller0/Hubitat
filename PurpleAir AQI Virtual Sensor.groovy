@@ -5,7 +5,7 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 
-public static String version() { return "1.2.3" }
+public static String version() { return "1.2.4" }
 
 metadata {
 	definition (
@@ -261,8 +261,8 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		log.debug "confidence: ${sensors.collect { it['confidence'] }}"
 		log.debug "humidity: ${sensors.collect { it['humidity'] }}"
 		//log.debug "pm1.0: ${sensors.collect { it['pm1.0'] }}"
-		log.debug "pm2_5_alt: ${sensors.collect { it['pm2.5_alt'] }}"
-		log.debug "pm2_5_cf_1: ${sensors.collect { it['pm2.5_cf_1'] }}"
+		log.debug "pm2_5_alt: ${sensors.collect { it['pm2_5_alt'] }}"
+		log.debug "pm2_5_cf_1: ${sensors.collect { it['pm2_5_cf_1'] }}"
 		//log.debug "pm10.0: ${sensors.collect { it['pm10.0'] }}"
 		log.debug "voc: ${sensors.collect { it['voc'] }}"
 		log.debug "ozone: ${sensors.collect { it['ozone'] }}"
@@ -349,10 +349,7 @@ Float sensorAverageWeighted(List<Map> sensors, String field, Float[] coords) {
 	
 	sensors.eachWithIndex { it, i ->
 		Float val = it[field]
-		Float weight = nearest / Math.sqrt(distances[i])
-		// Float weight = nearest / distances[i]
-		// if ( debugMode ) log.debug "weight=nearest/distance : ${weight} = ${nearest} / ${distances[i]}"
-		// if ( debugMode ) weights.add(weight)
+		Float weight = nearest / Math.sqrt(distances[i]) * (it['position_rating']+1)
 		sum = sum + val * weight
 		count = count + weight
 	}
