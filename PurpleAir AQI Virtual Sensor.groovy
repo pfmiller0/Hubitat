@@ -112,8 +112,8 @@ void sensorCheck() {
 	if (conversion) {
 		particles = "pm2.5"
 	}
-		
-	String query_fields="name,${particles},latitude,longitude,confidence,pm2.5_alt,pm2.5_cf_1,humidity"
+	
+	String query_fields="name,${particles},latitude,longitude,confidence,pm1.0,pm2.5_alt,pm2.5_cf_1,pm10.0,humidity,voc,ozone1,position_rating"
 	Map httpQuery
 	Float[] coords
 	
@@ -237,14 +237,19 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		part_count_conv = apply_conversion(conversion?:"none", Float.valueOf(it[RESPONSE_FIELDS[data.particles]]), Float.valueOf(it[RESPONSE_FIELDS['pm2.5_cf_1']]), Float.valueOf(it[RESPONSE_FIELDS['humidity']]?:avg_humidity))
 		sensors << [
 			'site': it[RESPONSE_FIELDS['name']],
-			'pm2_5': Float.valueOf(it[RESPONSE_FIELDS[data.particles]]),
-			'pm2_5_conv': part_count_conv,
-			'confidence': Integer.valueOf(it[RESPONSE_FIELDS['confidence']]),
+			'pm2_5': it[RESPONSE_FIELDS[data.particles]].toFloat(),
+			'pm2_5_conv': pm2_5_conv,
+			'confidence': it[RESPONSE_FIELDS['confidence']].toInteger(),
 			'distance': distance(data.coords, sensor_coords),
+			'position_rating': it[RESPONSE_FIELDS['position_rating']].toInteger(),
 			'coords': sensor_coords,
-			'pm2_5_alt': Float.valueOf(it[RESPONSE_FIELDS['pm2.5_alt']]),
-			'pm2_5_cf_1': Float.valueOf(it[RESPONSE_FIELDS['pm2.5_cf_1']]),
-			'humidity': Float.valueOf(it[RESPONSE_FIELDS['humidity']]?:avg_humidity)
+			//'pm1.0': (it[RESPONSE_FIELDS['pm1.0']]?:0).toFloat(),
+			'pm2_5_alt': (it[RESPONSE_FIELDS['pm2.5_alt']]?:0).toFloat(),
+			'pm2_5_cf_1': (it[RESPONSE_FIELDS['pm2.5_cf_1']]?:0).toFloat(),
+			//'pm10.0': (it[RESPONSE_FIELDS['pm10.0']]?:0).toFloat(),
+			'voc': (it[RESPONSE_FIELDS['voc']]?:0).toFloat(),
+			'ozone': (it[RESPONSE_FIELDS['ozone1']]?:0).toFloat(),
+			'humidity': this_humidity
 		]
 	}
 	if ( debugMode ) {
@@ -255,9 +260,16 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		log.debug "pm2_5_conv: ${sensors.collect { it['pm2_5_conv'] }}"
 		log.debug "confidence: ${sensors.collect { it['confidence'] }}"
 		log.debug "humidity: ${sensors.collect { it['humidity'] }}"
+		//log.debug "pm1.0: ${sensors.collect { it['pm1.0'] }}"
+		log.debug "pm2_5_alt: ${sensors.collect { it['pm2.5_alt'] }}"
+		log.debug "pm2_5_cf_1: ${sensors.collect { it['pm2.5_cf_1'] }}"
+		//log.debug "pm10.0: ${sensors.collect { it['pm10.0'] }}"
+		log.debug "voc: ${sensors.collect { it['voc'] }}"
+		log.debug "ozone: ${sensors.collect { it['ozone'] }}"
 		log.debug "AQIs: ${sensors.collect { getPart2_5_AQI(it['pm2_5']) }}"
 		log.debug "AQIs (${conversion?:"none"}): ${sensors.collect { getPart2_5_AQI(it['pm2_5_conv']) }}"
 		log.debug "distance: ${sensors.collect { it['distance'] }}"
+		log.debug "position_rating: ${sensors.collect { it['position_rating'] }}"
 		if ( device_search ) {
 			log.debug "unweighted av aqi (${conversion?:"none"}): ${getPart2_5_AQI(sensorAverage(sensors, 'pm2_5_conv'))}"
 			log.debug "weighted av aqi (${conversion?:"none"}): ${getPart2_5_AQI(sensorAverageWeighted(sensors, 'pm2_5_conv', data.coords))}"
@@ -321,6 +333,7 @@ Float sensorAverage(List<Map> sensors, String field) {
 	}
 }
 
+// TODO: Use position_rating as multiplier to weight accurate positions more
 Float sensorAverageWeighted(List<Map> sensors, String field, Float[] coords) {
 	Float count = 0.0
 	Float sum = 0.0
