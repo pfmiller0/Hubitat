@@ -14,7 +14,8 @@ definition(
 import groovy.transform.Field
 
 @Field final Float MIN_DELTA_TIME = 15.0
-@Field final Float MIN_DELTA = 1.0
+@Field final Float MIN_DELTA_TEMP = 1.0
+@Field final Float MIN_DELTA_HUMIDITY = 3.0
 
 preferences {
 	page(name: "mainPage")
@@ -30,7 +31,7 @@ def mainPage() {
 			if (thisName) app.updateLabel("$thisName")
 			input "useHum", "bool", title: "Use Humidity", defaultValue: false, width: 3, submitOnChange: true
 			input "useRateLimit", "bool", title: "Enable rate limiting", defaultValue: false, width: 3, submitOnChange: true
-			if (useRateLimit) paragraph "Ignoring changes of less than <b>${MIN_DELTA}</b> units over <b>${MIN_DELTA_TIME}</b> minutes."
+			if (useRateLimit) paragraph "Ignoring changes of less than <b>${MIN_DELTA_TEMP}°</b>/<b>${MIN_DELTA_HUMIDITY}%</b> over <b>${MIN_DELTA_TIME}</b> minutes."
 		}
 		section("<b>Temperature</b>") {
 			if (averageTempDev) paragraph "Average temperature device name: <b>${averageTempDev.label?:averageTempDev.name}</b>"
@@ -78,6 +79,8 @@ def installed() {
 }
 
 def updated() {
+	// Clear last_updates so we're not hanging onto old devices
+	state.remove("last_updates")
 	unsubscribe()
 	initialize()
 	offlineCheck()
@@ -233,37 +236,53 @@ Float getHeatindex(Float tempF, Float humidity) {
 	return hi.round(1)
 }
 
-// Limit too frequent events, only register change >1 degree, unless over an hour
-Boolean rateLimit(evt, String attr) {
+// Limit too frequent and too small events
+Boolean rateLimit(evt) {
 	if (! useRateLimit) {
 		return false
 	}
 	
-	def devEvents = evt.getDevice().events([max: 15]).findAll { it.name == attr }
-	if ( devEvents.size() < 2 ) {
-		devEvents = evt.getDevice().events([max: 30]).findAll { it.name == attr }
-		log.debug "second try count: ${devEvents.size()}"
-		if ( devEvents.size() < 2 ) {
-			log.debug "${devLabel} (${attr}): Okay (less than 2 events)"
-			return false
-		}
+	Float minSinceLastUpdate
+	Float lastValue
+	Float curValue
+	String dev_attr = "${evt.getDeviceId()}_${evt.name}"
+		
+	String devLabel = evt.getDisplayName()
+	
+	state.last_updates = state.last_updates?:[:]
+	
+	if (! state.last_updates[dev_attr] ) {
+		log.debug "${devLabel} (${evt.name}): Okay (no saved state)"
+		state.last_updates[dev_attr] = [value: evt.value, time: now()]
+		return false
 	}
 	
-	String devLabel = devEvents[0].getDisplayName()
-	Float minSinceLastUpdate = ((now() - devEvents[1].getUnixTime()) / (1000 * 60))
+	lastValue = Float.parseFloat(state.last_updates[dev_attr].value)
+	minSinceLastUpdate = (now() - state.last_updates[dev_attr].time) / (1000 * 60)
 	minSinceLastUpdate = (minSinceLastUpdate * 100).round() / 100
-	Float lastTemp = Float.parseFloat(devEvents[0].value)
+	curValue = Float.parseFloat(evt.value)
 
 	if (minSinceLastUpdate < MIN_DELTA_TIME) {
-		if (Math.abs(Float.parseFloat(devEvents[1].value) - lastTemp) < MIN_DELTA) {
-			log.debug "${devLabel} (${attr}): Not Okay, change too recent (${minSinceLastUpdate} mins) & small (${Math.abs(Float.parseFloat(devEvents[1].value) - lastTemp).round(2)} deg diff)"
-			return true
+		if (evt.name == "temperature") {
+			if (Math.abs(curValue - lastValue) < MIN_DELTA_TEMP) {
+				log.debug "${devLabel} (${evt.name}): Not Okay, change too recent (${minSinceLastUpdate} mins) & small (${(curValue - lastValue).round(2)}° diff)"
+				return true
+			} else {
+				log.debug "${devLabel} (${evt.name}): Okay (${(curValue - lastValue).round(2)}° diff)"
+			}
 		} else {
-			log.debug "${devLabel} (${attr}): Okay (${Math.abs(Float.parseFloat(devEvents[1].value) - lastTemp)} deg diff)"
+			if (Math.abs(curValue - lastValue) < MIN_DELTA_HUMIDITY) {
+				log.debug "${devLabel} (${evt.name}): Not Okay, change too recent (${minSinceLastUpdate} mins) & small (${(curValue - lastValue).round(2)}% diff)"
+				return true
+			} else {
+				log.debug "${devLabel} (${evt.name}): Okay (${(curValue - lastValue).round(2)}% diff)"
+			}
 		}
 	} else {
-		log.debug "${devLabel} (${attr}): Okay (${minSinceLastUpdate} mins)"
+		log.debug "${devLabel} (${evt.name}): Okay (${minSinceLastUpdate} mins, ${(curValue - lastValue).round(2)} diff)"
 	}
+	
+	state.last_updates[dev_attr] = [value: evt.value, time: now()]
 	
 	return false
 }
@@ -280,7 +299,7 @@ void tempHandler(evt) {
 	
 	offlineCheck()
 
-	if ( rateLimit(evt, "temperature") ) {
+	if ( rateLimit(evt) ) {
 		return
 	}
 	
@@ -314,7 +333,7 @@ void humHandler(evt) {
 	
 	offlineCheck()
 	
-	if ( rateLimit(evt, "humidity") ) {
+	if ( rateLimit(evt) ) {
 		return
 	}
 	
