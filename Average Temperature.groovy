@@ -11,6 +11,11 @@ definition(
 
 // Originally based on the "Average Temperature" sample app by Bruce Ravenel
 
+import groovy.transform.Field
+
+@Field final Float MIN_DELTA_TIME = 15.0
+@Field final Float MIN_DELTA = 1.0
+
 preferences {
 	page(name: "mainPage")
 }
@@ -24,6 +29,8 @@ def mainPage() {
 			input "thisName", "text", title: "Name this temperature averager", submitOnChange: true
 			if (thisName) app.updateLabel("$thisName")
 			input "useHum", "bool", title: "Use Humidity", defaultValue: false, width: 3, submitOnChange: true
+			input "useRateLimit", "bool", title: "Enable rate limiting", defaultValue: false, width: 3, submitOnChange: true
+			if (useRateLimit) paragraph "Ignoring changes of less than <b>${MIN_DELTA}</b> units over <b>${MIN_DELTA_TIME}</b> minutes."
 		}
 		section("<b>Temperature</b>") {
 			if (averageTempDev) paragraph "Average temperature device name: <b>${averageTempDev.label?:averageTempDev.name}</b>"
@@ -150,7 +157,7 @@ Float averageDevs(List devs, String attr, Integer run = 1) {
 	devs.each {
 		if (it.getStatus() == "ACTIVE") { // Device goes INACTIVE after 24 hrs w/out events
 			weight = settings["weight_${attr}${it.id}"] ?: 1
-			/****
+			/****/
 			hrSinceLastUpdate = (now() - it.currentState(attr).date.time) / (1000 * 60 * 60)
 			timeWeightAdjust = hrSinceLastUpdate**exp / div + 1
 			/****/
@@ -226,6 +233,41 @@ Float getHeatindex(Float tempF, Float humidity) {
 	return hi.round(1)
 }
 
+// Limit too frequent events, only register change >1 degree, unless over an hour
+Boolean rateLimit(evt, String attr) {
+	if (! useRateLimit) {
+		return false
+	}
+	
+	def devEvents = evt.getDevice().events([max: 15]).findAll { it.name == attr }
+	if ( devEvents.size() < 2 ) {
+		devEvents = evt.getDevice().events([max: 30]).findAll { it.name == attr }
+		log.debug "second try count: ${devEvents.size()}"
+		if ( devEvents.size() < 2 ) {
+			log.debug "${devLabel} (${attr}): Okay (less than 2 events)"
+			return false
+		}
+	}
+	
+	String devLabel = devEvents[0].getDisplayName()
+	Float minSinceLastUpdate = ((now() - devEvents[1].getUnixTime()) / (1000 * 60))
+	minSinceLastUpdate = (minSinceLastUpdate * 100).round() / 100
+	Float lastTemp = Float.parseFloat(devEvents[0].value)
+
+	if (minSinceLastUpdate < MIN_DELTA_TIME) {
+		if (Math.abs(Float.parseFloat(devEvents[1].value) - lastTemp) < MIN_DELTA) {
+			log.debug "${devLabel} (${attr}): Not Okay, change too recent (${minSinceLastUpdate} mins) & small (${Math.abs(Float.parseFloat(devEvents[1].value) - lastTemp).round(2)} deg diff)"
+			return true
+		} else {
+			log.debug "${devLabel} (${attr}): Okay (${Math.abs(Float.parseFloat(devEvents[1].value) - lastTemp)} deg diff)"
+		}
+	} else {
+		log.debug "${devLabel} (${attr}): Okay (${minSinceLastUpdate} mins)"
+	}
+	
+	return false
+}
+
 void tempHandler(evt) {
 	Float avg
 	def averageTempDev = getChildDevice("AverageTemp_${app.id}")
@@ -237,6 +279,10 @@ void tempHandler(evt) {
 	}
 	
 	offlineCheck()
+
+	if ( rateLimit(evt, "temperature") ) {
+		return
+	}
 	
 	if (useRun > 1) {
 		state.runTemp = state.runTemp.drop(1) + avg
@@ -267,7 +313,11 @@ void humHandler(evt) {
 	Float avg
 	
 	offlineCheck()
-		
+	
+	if ( rateLimit(evt, "humidity") ) {
+		return
+	}
+	
 	if (useRun > 1) {
 		state.runHum = state.runHum.drop(1) + avg
 		avg = averageDevs(humSensors, "humidity", useRun)
