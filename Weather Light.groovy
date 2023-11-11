@@ -16,6 +16,76 @@ definition(
 	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Weather%20Light.groovy"
 )
 
+import groovy.transform.Field
+
+@Field final static List<Map> tempScaleSmartthings = [ /* Standard SmartThings temperature colors */
+	[temp: 31, hsv: [62, 86, 0], name: "indigo"],
+	[temp: 44, hsv: [53, 84, 0], name: "turquoise"],
+	[temp: 59, hsv: [39, 31, 0], name: "mint"],
+	[temp: 74, hsv: [29, 82, 0], name: "green"],
+	[temp: 84, hsv: [15, 100, 0], name: "yellow"],
+	[temp: 95, hsv: [6, 100, 0], name: "orange"],
+	[temp: 96, hsv: [0, 81, 0], name: "red"]
+]
+
+@Field final static List<Map> tempScaleWeatherchannel = [ /* Source: https://s.w-x.co/staticmaps/acttemp_1280x720.jpg */
+	[temp: -40, hsv: [74, 44, 0], name: "lavender"],
+	[temp: -30, hsv: [75, 30, 0], name: "gray-purple"],
+	[temp: -20, hsv: [76, 23, 0], name: "light purple"],
+	[temp: -10, hsv: [89, 94, 0], name: "burgundy"],
+	[temp: 0, hsv: [85, 65, 0], name: "dark purple"],
+	[temp: 10, hsv: [82, 46, 0], name: "purple"],
+	[temp: 20, hsv: [55, 33, 0], name: "light blue"],
+	[temp: 30, hsv: [60, 45, 0], name: "blue"],
+	[temp: 40, hsv: [66, 84, 0], name: "dark blue"],
+	[temp: 50, hsv: [70, 34, 0], name: "dark gray"],
+	[temp: 60, hsv: [16, 76, 0], name: "yellow"],
+	[temp: 70, hsv: [10, 100, 0], name: "orange"],
+	[temp: 80, hsv: [2, 98, 0], name: "red-orange"],
+	[temp: 90, hsv: [0, 100, 0], name: "dark red"],
+	[temp: 100, hsv: [91, 53, 0], name: "pink"],
+	[temp: 110, hsv: [88, 5, 0], name: "eggshell"],
+	[temp: 120, hsv: [17, 24, 0], name: "sand"]
+]
+
+@Field final static List<Map> tempScalePetes = [
+	[temp: -40, hsv: [74, 75, 0], name: "lavender"],
+	[temp: -30, hsv: [75, 75, 0], name: "gray-purple"],
+	[temp: -20, hsv: [76, 75, 0], name: "light purple"],
+	[temp: -10, hsv: [89, 75, 0], name: "burgundy"],
+	[temp: 0, hsv: [85, 80, 0], name: "dark purple"],
+	[temp: 10, hsv: [82, 80, 0], name: "purple"],
+	[temp: 20, hsv: [66, 90, 0], name: "dark blue"],
+	[temp: 32, hsv: [52, 100, 0], name: "ice blue"],
+	[temp: 56, hsv: [55, 100, 0], name: "light blue"],
+	[temp: 68, hsv: [33, 100, 0], name: "green"],
+	[temp: 80, hsv: [16, 100, 0], name: "yellow"],
+	[temp: 90, hsv: [10, 100, 0], name: "orange"],
+	[temp: 100, hsv: [0, 90, 0], name: "dark red"],
+	[temp: 110, hsv: [91, 80, 0], name: "pink"],
+	[temp: 120, hsv: [91, 75, 0], name: "pink"]
+]
+
+@Field final static List<Map> tempScaleSpectrum = [
+	[temp: 0, hsv: [83, 75, 0], name: "purple"],
+	[temp: 32, hsv: [83, 100, 0], name: "purple"],
+//	[temp: 65, hsv: [43, 100, 0], name: ""],
+//	[temp: 70, hsv: [37, 100, 0], name: ""],
+//	[temp: 75, hsv: [31, 100, 0], name: ""],
+	[temp: 100, hsv: [0, 100, 0], name: "red"],
+	[temp: 120, hsv: [0, 75, 0], name: "red"]
+]
+
+@Field final static List<Map> tempScaleSpectrum2 = [
+	[temp: 0, hsv: [83, 75, 0], name: "purple"],
+	[temp: 32, hsv: [83, 100, 0], name: "purple"],
+	[temp: 65, hsv: [49, 100, 0], name: ""],
+	[temp: 70, hsv: [37, 100, 0], name: ""],
+	[temp: 75, hsv: [25, 100, 0], name: ""],
+	[temp: 100, hsv: [0, 100, 0], name: "red"],
+	[temp: 120, hsv: [0, 75, 0], name: "red"]
+]
+	
 preferences {
 	section() {
 		input "isPaused", "bool", title: "Pause app", defaultValue: false
@@ -25,8 +95,11 @@ preferences {
 		input "lights", "capability.colorControl", title: "Lights", required: true, multiple: true
 	}
 	section("<b>Settings</b>") {
-		input "colorOption", "enum", title: "Color scale", options: ["Pete's", "Weather Channel", "Spectrum", "Spectrum 2", "Smartthings"]
+		input "colorOption", "enum", title: "Color scale", required: true, options: ["Pete's", "Weather Channel", "Spectrum", "Spectrum 2", "Smartthings"]
 		input "saturationOption", "decimal", title: "Saturation (0..1) ", required: true, defaultValue: 0.95, range: "0..1"
+		if (colorOption && thermoOut) {
+			paragraph "Current temperature: ${getTemp()} ${colorSquare(getHex(getColor(getTemp(), getScale())), 15)}"
+		}
 	}
 	section("<b>Debug</b>") {
 		input "debugMode", "bool", title: "Debug Mode", submitOnChange: true
@@ -35,84 +108,6 @@ preferences {
 			input "tempDebug", "number", title: "Temp override"
 		}
 	}
-}
-
-List<Map> tempScaleSmartthings() { /* Standard SmartThings temperature colors */
-	return [
-		[temp: 31, hsv: [62, 86, 0], name: "indigo"],
-		[temp: 44, hsv: [53, 84, 0], name: "turquoise"],
-		[temp: 59, hsv: [39, 31, 0], name: "mint"],
-		[temp: 74, hsv: [29, 82, 0], name: "green"],
-		[temp: 84, hsv: [15, 100, 0], name: "yellow"],
-		[temp: 95, hsv: [6, 100, 0], name: "orange"],
-		[temp: 96, hsv: [0, 81, 0], name: "red"]
-	]
-}
-
-List<Map> tempScaleWeatherchannel() { /* Source: https://s.w-x.co/staticmaps/acttemp_1280x720.jpg */
-	return [
-		[temp: -40, hsv: [74, 44, 0], name: "lavender"],
-		[temp: -30, hsv: [75, 30, 0], name: "gray-purple"],
-		[temp: -20, hsv: [76, 23, 0], name: "light purple"],
-		[temp: -10, hsv: [89, 94, 0], name: "burgundy"],
-		[temp: 0, hsv: [85, 65, 0], name: "dark purple"],
-		[temp: 10, hsv: [82, 46, 0], name: "purple"],
-		[temp: 20, hsv: [55, 33, 0], name: "light blue"],
-		[temp: 30, hsv: [60, 45, 0], name: "blue"],
-		[temp: 40, hsv: [66, 84, 0], name: "dark blue"],
-		[temp: 50, hsv: [70, 34, 0], name: "dark gray"],
-		[temp: 60, hsv: [16, 76, 0], name: "yellow"],
-		[temp: 70, hsv: [10, 100, 0], name: "orange"],
-		[temp: 80, hsv: [2, 98, 0], name: "red-orange"],
-		[temp: 90, hsv: [0, 100, 0], name: "dark red"],
-		[temp: 100, hsv: [91, 53, 0], name: "pink"],
-		[temp: 110, hsv: [88, 5, 0], name: "eggshell"],
-		[temp: 120, hsv: [17, 24, 0], name: "sand"]
-	]
-}
-
-List<Map> tempScalePetes() {
-	return [
-		[temp: -40, hsv: [74, 75, 0], name: "lavender"],
-		[temp: -30, hsv: [75, 75, 0], name: "gray-purple"],
-		[temp: -20, hsv: [76, 75, 0], name: "light purple"],
-		[temp: -10, hsv: [89, 75, 0], name: "burgundy"],
-		[temp: 0, hsv: [85, 80, 0], name: "dark purple"],
-		[temp: 10, hsv: [82, 80, 0], name: "purple"],
-		[temp: 20, hsv: [66, 90, 0], name: "dark blue"],
-		[temp: 32, hsv: [52, 100, 0], name: "ice blue"],
-		[temp: 56, hsv: [55, 100, 0], name: "light blue"],
-		[temp: 68, hsv: [33, 100, 0], name: "green"],
-		[temp: 80, hsv: [16, 100, 0], name: "yellow"],
-		[temp: 90, hsv: [10, 100, 0], name: "orange"],
-		[temp: 100, hsv: [0, 90, 0], name: "dark red"],
-		[temp: 110, hsv: [91, 80, 0], name: "pink"],
-		[temp: 120, hsv: [91, 75, 0], name: "pink"]
-	]
-}
-
-List<Map> tempScaleSpectrum() {
-	return [
-		[temp: 0, hsv: [83, 75, 0], name: "purple"],
-		[temp: 32, hsv: [83, 100, 0], name: "purple"],
-//		[temp: 65, hsv: [43, 100, 0], name: ""],
-//		[temp: 70, hsv: [37, 100, 0], name: ""],
-//		[temp: 75, hsv: [31, 100, 0], name: ""],
-		[temp: 100, hsv: [0, 100, 0], name: "red"],
-		[temp: 120, hsv: [0, 75, 0], name: "red"]
-	]
-}
-
-List<Map> tempScaleSpectrum2() {
-	return [
-		[temp: 0, hsv: [83, 75, 0], name: "purple"],
-		[temp: 32, hsv: [83, 100, 0], name: "purple"],
-		[temp: 65, hsv: [49, 100, 0], name: ""],
-		[temp: 70, hsv: [37, 100, 0], name: ""],
-		[temp: 75, hsv: [25, 100, 0], name: ""],
-		[temp: 100, hsv: [0, 100, 0], name: "red"],
-		[temp: 120, hsv: [0, 75, 0], name: "red"]
-	]
 }
 
 void installed() {
@@ -131,27 +126,12 @@ void initialize() {
 		subscribe(thermoOut, 'temperature', 'updateLight')
 		subscribe(lights, 'switch', 'switchHandler')
 
-		if (colorOption == "Pete's") {
-			if (debugMode) log.debug "Using Pete's colors"
-			state.tempScale = tempScalePetes()
-		} else if (colorOption == "Weather Channel") {
-			if (debugMode) log.debug "Using Weather Channel colors"
-			state.tempScale = tempScaleWeatherchannel()
-		} else if (colorOption == "Spectrum") {
-			if (debugMode) log.debug "Using Spectrum colors"
-			state.tempScale = tempScaleSpectrum()
-		} else if (colorOption == "Spectrum 2") {
-			if (debugMode) log.debug "Using Spectrum2 colors"
-			state.tempScale = tempScaleSpectrum2()
-		} else if (colorOption == "Smartthings") {
-			if (debugMode) log.debug "Using Smartthings colors"
-			state.tempScale = tempScaleSmartthings()
-		} else {
-			if (debugMode) log.debug "Defaulting to Pete's colors: colorOption = $colorOption"	
-			state.tempScale = tempScalePetes()
-		}
 		updateLight()
 	}
+}
+
+String colorSquare(String hex, Integer size=20) {
+	return "<svg width='${size}' height='${size}'><rect width='${size}' height='${size}' style='fill:${hex};stroke-width:3;stroke:rgb(0,0,0)' /></svg>"
 }
 
 void switchHandler(evt) {
@@ -166,37 +146,60 @@ void switchHandler(evt) {
 void updateLight(evt) {
 	Float tempOut
 	List<Integer> hsvTempColor = null
-	Float satLevel = saturationOption
-	
-	if (satLevel > 1) {
-		satLevel = 1.0
-	} else if (satLevel < 0) {
-		satLevel = 0
-	} 
 
-	if (thermoOut.getStatus() != "ACTIVE") {
-		log.warn "Temp sensor is not online, do nothing"	
-	} else {
-		if (!debugMode || tempDebug == null) {
-			tempOut = thermoOut.latestValue("temperature")
-			if (debugMode) log.debug "temp: $tempOut"
-		} else {
-			tempOut = tempDebug ?: thermoOut.latestValue("temperature")
-			if (debugMode) log.debug "DEBUG temp: $tempOut"
-		}
-
-		hsvTempColor = getColor(tempOut, state.tempScale)
+	tempOut = getTemp()
+	if (tempOut) {
+		hsvTempColor = getColor(tempOut, getScale())
 		
-		// Adjust saturation to configured level
-		hsvTempColor[1] = (hsvTempColor[1] * satLevel) as Integer
-
 		for (light in lights) {
 			if (light.latestValue("switch") == "on") {
 				if (debugMode) log.debug "Changing light $light"
 				light.setColor(["hue": hsvTempColor[0], "saturation": hsvTempColor[1], "level": light.latestValue("level")])
 			}
 		}
+		
+		if (debugMode) log.debug "Set color ${getHex(hsvTempColor)} ${colorSquare(getHex(hsvTempColor), 18)}"
 	}
+}
+
+List<Map> getScale() {
+	if (colorOption == "Pete's") {
+		if (debugMode) log.debug "Using Pete's colors"
+		return tempScalePetes
+	} else if (colorOption == "Weather Channel") {
+		if (debugMode) log.debug "Using Weather Channel colors"
+		return tempScaleWeatherchannel
+	} else if (colorOption == "Spectrum") {
+		if (debugMode) log.debug "Using Spectrum colors"
+		return tempScaleSpectrum
+	} else if (colorOption == "Spectrum 2") {
+		if (debugMode) log.debug "Using Spectrum2 colors"
+		return tempScaleSpectrum2
+	} else if (colorOption == "Smartthings") {
+		if (debugMode) log.debug "Using Smartthings colors"
+		return tempScaleSmartthings
+	} else {
+		if (debugMode) log.debug "Defaulting to Pete's colors: colorOption = $colorOption"	
+		return tempScalePetes
+	}
+}
+
+Float getTemp() {
+	Float temp = null
+
+	if (thermoOut?.getStatus() != "ACTIVE") {
+		log.warn "Temp sensor is not online, do nothing"	
+	} else {
+		if (!debugMode || tempDebug == null) {
+			temp = thermoOut.latestValue("temperature")
+			if (debugMode) log.debug "temp: $temp"
+		} else {
+			temp = tempDebug ?: thermoOut.latestValue("temperature")
+			if (debugMode) log.debug "DEBUG temp: $temp"
+		}
+	}
+	
+	return temp
 }
 
 List<Integer> getColor(Float temp, List<Map> colorScale) {
@@ -206,8 +209,16 @@ List<Integer> getColor(Float temp, List<Map> colorScale) {
 	List<Integer> colorLow = null
 	List<Integer> colorHigh = null
 	List<Integer> colorLast = null
+	List<Integer> colorReturn = null
 	Float rangePercent
-
+	Float satLevel = saturationOption
+	
+	if (satLevel > 1) {
+		satLevel = 1.0
+	} else if (satLevel < 0) {
+		satLevel = 0
+	}
+	
 	for (i in colorScale) {
 		//if (debugMode) log.debug "i = $i; tempLow = $tempLow; tempHigh = $tempHigh; tempLast = $tempLast"
 		if (temp < i.temp && tempLast == null) {
@@ -234,12 +245,16 @@ List<Integer> getColor(Float temp, List<Map> colorScale) {
 		rangePercent = (temp - tempLow)/(tempHigh - tempLow)
 	}
 	if (debugMode) log.debug "tempLow: $tempLow, temp = $temp ($rangePercent); tempHigh: $tempHigh"
-    
-	return getColorOnRange(colorLow, colorHigh, rangePercent)
+	
+	colorReturn = getColorOnRange(colorLow, colorHigh, rangePercent)
+
+	// Adjust saturation to configured level
+	colorReturn[1] = (colorReturn[1] * satLevel) as Integer
+	return colorReturn
 }
 
 List<Integer> getColorOnRange(List<Integer> colorOne, List<Integer> colorTwo, Float percent) {
-	List<Integer> hsvColorNew = [0, 0, 0]
+	List<Integer> hsvColorNew = [100, 100, 100]
 
 	for (i in 0..1) { // for H and S (we don't need V)
 		hsvColorNew[i] = Math.round(((colorTwo[i] - colorOne[i]) * percent) + colorOne[i])
@@ -248,4 +263,9 @@ List<Integer> getColorOnRange(List<Integer> colorOne, List<Integer> colorTwo, Fl
 	if (debugMode) log.debug "colorOne = $colorOne; hsvColorNew = $hsvColorNew; colorTwo = $colorTwo"
 
 	return hsvColorNew
+}
+
+String getHex(List<Integer> hsvColor) {
+	if (debugMode) log.debug "getHex in: ${hsvColor}"
+	return hubitat.helper.ColorUtils.rgbToHEX(hubitat.helper.ColorUtils.hsvToRGB(hsvColor))
 }
