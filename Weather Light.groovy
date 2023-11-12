@@ -95,10 +95,15 @@ preferences {
 		input "lights", "capability.colorControl", title: "Lights", required: true, multiple: true
 	}
 	section("<b>Settings</b>") {
-		input "colorOption", "enum", title: "Color scale", required: true, options: ["Pete's", "Weather Channel", "Spectrum", "Spectrum 2", "Smartthings"]
-		input "saturationOption", "decimal", title: "Saturation (0..1) ", required: true, defaultValue: 0.95, range: "0..1"
+		input "colorOption", "enum", title: "Color scale", required: true, submitOnChange: true, options: ["Pete's", "Weather Channel", "Spectrum", "Spectrum 2", "Smartthings"]
+		if (colorOption) {
+			String t = ""
+			getScale().each {t += "<tr><td style='text-align:right;padding-left:50px;padding-right:10px'>${it.temp}°F</td><td>${colorSquare(getHex(it.hsv))}  ${it.name?' - '+it.name:""}</td></tr>"}
+			paragraph "<table style='border:px solid silver; border-collapse:collapse; width:40%; font-size:90%;'>${t}</table>"
+		}	
+		input "saturationOption", "decimal", title: "Saturation (0..1) ", required: true, submitOnChange: true, defaultValue: 0.95, range: "0..1"
 		if (colorOption && thermoOut) {
-			paragraph "Current temperature: ${getTemp()} ${colorSquare(getHex(getColor(getTemp(), getScale())), 15)}"
+			paragraph "Current temperature: ${getTemp()}° ${colorSquare(getHex(getColor(getTemp(), getScale())), 15)}"
 		}
 	}
 	section("<b>Debug</b>") {
@@ -131,7 +136,7 @@ void initialize() {
 }
 
 String colorSquare(String hex, Integer size=20) {
-	return "<svg width='${size}' height='${size}'><rect width='${size}' height='${size}' style='fill:${hex};stroke-width:3;stroke:rgb(0,0,0)' /></svg>"
+	return "<svg style='vertical-align:text-top' width='${size}' height='${size}'><rect x='1' y='1' width='${size-2}' height='${size-2}' style='fill:${hex};stroke-width:1;stroke:rgb(0,0,0)' /></svg>"
 }
 
 void switchHandler(evt) {
