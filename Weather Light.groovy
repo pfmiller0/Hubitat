@@ -19,71 +19,71 @@ definition(
 import groovy.transform.Field
 
 @Field final static List<Map> tempScaleSmartthings = [ /* Standard SmartThings temperature colors */
-	[temp: 31, hsv: [62, 86, 0], name: "indigo"],
-	[temp: 44, hsv: [53, 84, 0], name: "turquoise"],
-	[temp: 59, hsv: [39, 31, 0], name: "mint"],
-	[temp: 74, hsv: [29, 82, 0], name: "green"],
-	[temp: 84, hsv: [15, 100, 0], name: "yellow"],
-	[temp: 95, hsv: [6, 100, 0], name: "orange"],
-	[temp: 96, hsv: [0, 81, 0], name: "red"]
+	[temp: 31, hsv: [62, 86, 100], name: "indigo"],
+	[temp: 44, hsv: [53, 84, 100], name: "turquoise"],
+	[temp: 59, hsv: [39, 31, 100], name: "mint"],
+	[temp: 74, hsv: [29, 82, 100], name: "green"],
+	[temp: 84, hsv: [15, 100, 100], name: "yellow"],
+	[temp: 95, hsv: [6, 100, 100], name: "orange"],
+	[temp: 96, hsv: [0, 81, 100], name: "red"]
 ]
 
 @Field final static List<Map> tempScaleWeatherchannel = [ /* Source: https://s.w-x.co/staticmaps/acttemp_1280x720.jpg */
-	[temp: -40, hsv: [74, 44, 0], name: "lavender"],
-	[temp: -30, hsv: [75, 30, 0], name: "gray-purple"],
-	[temp: -20, hsv: [76, 23, 0], name: "light purple"],
-	[temp: -10, hsv: [89, 94, 0], name: "burgundy"],
-	[temp: 0, hsv: [85, 65, 0], name: "dark purple"],
-	[temp: 10, hsv: [82, 46, 0], name: "purple"],
-	[temp: 20, hsv: [55, 33, 0], name: "light blue"],
-	[temp: 30, hsv: [60, 45, 0], name: "blue"],
-	[temp: 40, hsv: [66, 84, 0], name: "dark blue"],
-	[temp: 50, hsv: [70, 34, 0], name: "dark gray"],
-	[temp: 60, hsv: [16, 76, 0], name: "yellow"],
-	[temp: 70, hsv: [10, 100, 0], name: "orange"],
-	[temp: 80, hsv: [2, 98, 0], name: "red-orange"],
-	[temp: 90, hsv: [0, 100, 0], name: "dark red"],
-	[temp: 100, hsv: [91, 53, 0], name: "pink"],
-	[temp: 110, hsv: [88, 5, 0], name: "eggshell"],
-	[temp: 120, hsv: [17, 24, 0], name: "sand"]
+	[temp: -40, hsv: [74, 44, 100], name: "lavender"],
+	[temp: -30, hsv: [75, 30, 100], name: "gray-purple"],
+	[temp: -20, hsv: [76, 23, 100], name: "light purple"],
+	[temp: -10, hsv: [89, 94, 100], name: "burgundy"],
+	[temp: 0, hsv: [85, 65, 100], name: "dark purple"],
+	[temp: 10, hsv: [82, 46, 100], name: "purple"],
+	[temp: 20, hsv: [55, 33, 100], name: "light blue"],
+	[temp: 30, hsv: [60, 45, 100], name: "blue"],
+	[temp: 40, hsv: [66, 84, 100], name: "dark blue"],
+	[temp: 50, hsv: [70, 34, 100], name: "dark gray"],
+	[temp: 60, hsv: [16, 76, 100], name: "yellow"],
+	[temp: 70, hsv: [10, 100, 100], name: "orange"],
+	[temp: 80, hsv: [2, 98, 100], name: "red-orange"],
+	[temp: 90, hsv: [0, 100, 100], name: "dark red"],
+	[temp: 100, hsv: [91, 53, 100], name: "pink"],
+	[temp: 110, hsv: [88, 5, 100], name: "eggshell"],
+	[temp: 120, hsv: [17, 24, 100], name: "sand"]
 ]
 
 @Field final static List<Map> tempScalePetes = [
-	[temp: -40, hsv: [74, 75, 0], name: "lavender"],
-	[temp: -30, hsv: [75, 75, 0], name: "gray-purple"],
-	[temp: -20, hsv: [76, 75, 0], name: "light purple"],
-	[temp: -10, hsv: [89, 75, 0], name: "burgundy"],
-	[temp: 0, hsv: [85, 80, 0], name: "dark purple"],
-	[temp: 10, hsv: [82, 80, 0], name: "purple"],
-	[temp: 20, hsv: [66, 90, 0], name: "dark blue"],
-	[temp: 32, hsv: [52, 100, 0], name: "ice blue"],
-	[temp: 56, hsv: [55, 100, 0], name: "light blue"],
-	[temp: 68, hsv: [33, 100, 0], name: "green"],
-	[temp: 80, hsv: [16, 100, 0], name: "yellow"],
-	[temp: 90, hsv: [10, 100, 0], name: "orange"],
-	[temp: 100, hsv: [0, 90, 0], name: "dark red"],
-	[temp: 110, hsv: [91, 80, 0], name: "pink"],
-	[temp: 120, hsv: [91, 75, 0], name: "pink"]
+	[temp: -40, hsv: [74, 75, 100], name: "lavender"],
+	[temp: -30, hsv: [75, 75, 100], name: "gray-purple"],
+	[temp: -20, hsv: [76, 75, 100], name: "light purple"],
+	[temp: -10, hsv: [89, 75, 100], name: "burgundy"],
+	[temp: 0, hsv: [85, 80, 100], name: "dark purple"],
+	[temp: 10, hsv: [82, 80, 100], name: "purple"],
+	[temp: 20, hsv: [66, 90, 100], name: "dark blue"],
+	[temp: 32, hsv: [52, 100, 100], name: "ice blue"],
+	[temp: 56, hsv: [55, 100, 100], name: "light blue"],
+	[temp: 68, hsv: [33, 100, 100], name: "green"],
+	[temp: 80, hsv: [16, 100, 100], name: "yellow"],
+	[temp: 90, hsv: [10, 100, 100], name: "orange"],
+	[temp: 100, hsv: [0, 90, 100], name: "dark red"],
+	[temp: 110, hsv: [91, 80, 100], name: "pink"],
+	[temp: 120, hsv: [91, 75, 100], name: "pink"]
 ]
 
 @Field final static List<Map> tempScaleSpectrum = [
-	[temp: 0, hsv: [83, 75, 0], name: "purple"],
-	[temp: 32, hsv: [83, 100, 0], name: "purple"],
-//	[temp: 65, hsv: [43, 100, 0], name: ""],
-//	[temp: 70, hsv: [37, 100, 0], name: ""],
-//	[temp: 75, hsv: [31, 100, 0], name: ""],
-	[temp: 100, hsv: [0, 100, 0], name: "red"],
-	[temp: 120, hsv: [0, 75, 0], name: "red"]
+	[temp: 0, hsv: [83, 75, 100], name: "purple"],
+	[temp: 32, hsv: [83, 100, 100], name: "purple"],
+//	[temp: 65, hsv: [43, 100, 100], name: ""],
+//	[temp: 70, hsv: [37, 100, 100], name: ""],
+//	[temp: 75, hsv: [31, 100, 100], name: ""],
+	[temp: 100, hsv: [0, 100, 100], name: "red"],
+	[temp: 120, hsv: [0, 75, 100], name: "red"]
 ]
 
 @Field final static List<Map> tempScaleSpectrum2 = [
-	[temp: 0, hsv: [83, 75, 0], name: "purple"],
-	[temp: 32, hsv: [83, 100, 0], name: "purple"],
-	[temp: 65, hsv: [49, 100, 0], name: ""],
-	[temp: 70, hsv: [37, 100, 0], name: ""],
-	[temp: 75, hsv: [25, 100, 0], name: ""],
-	[temp: 100, hsv: [0, 100, 0], name: "red"],
-	[temp: 120, hsv: [0, 75, 0], name: "red"]
+	[temp: 0, hsv: [83, 75, 100], name: "purple"],
+	[temp: 32, hsv: [83, 100, 100], name: "purple"],
+	[temp: 65, hsv: [49, 100, 100], name: ""],
+	[temp: 70, hsv: [37, 100, 100], name: ""],
+	[temp: 75, hsv: [25, 100, 100], name: ""],
+	[temp: 100, hsv: [0, 100, 100], name: "red"],
+	[temp: 120, hsv: [0, 75, 100], name: "red"]
 ]
 	
 preferences {
