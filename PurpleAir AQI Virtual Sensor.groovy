@@ -5,7 +5,9 @@
  *  API documentation: https://api.purpleair.com/ 
  */
 
-public static String version() { return "1.2.4" }
+import groovy.transform.Field
+
+@Field final static String VERSION = "1.3.0"
 
 metadata {
 	definition (
@@ -30,9 +32,11 @@ metadata {
 	preferences {
 		input "X_API_Key", "text", title: "PurpleAir API key", required: true, description: "Contact contact@purpleair.com to request an API key"
 		input "update_interval", "enum", title: "Update interval", required: true, options: [["1": "1 min"], ["5": "5 min"], ["10": "10 min"], ["15": "15 min"], ["30": "30 min"], ["60": "1 hr"], ["180": "3 hr"]], defaultValue: "60"
-		input "conversion", "enum", title: "Apply conversion", required: false, description: "See map.purpleair.com for details", options: ["US EPA", "Woodsmoke", "AQ&U", "LRAPA"]
+		input "conversion", "enum", title: "Apply conversion", required: false, description: "See map.purpleair.com for details", options: [["US EPA": "US EPA"], ["Woodsmoke": "Woodsmoke"], ["AQ&U": "AQ&U"], ["CF=1": "CF=1"], ["LRAPA": "LRAPA"]]
 		if (! conversion) {
 			input "avg_period", "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: [["pm2.5": "1 min"], ["pm2.5_10minute": "10 mins"], ["pm2.5_30minute": "30 mins"], ["pm2.5_60minute": "1 hour"], ["pm2.5_6hour": "6 hours"], ["pm2.5_24hour": "1 day"], ["pm2.5_1week": "1 week"]], defaultValue: "pm2.5_60minute"
+		} else if ( conversion == "US EPA" ) {
+			input "hum_history", "bool", title: "Humidity history", required: false, description: "Keep recent history of humidity values to detect bad sensors", defaultValue: false
 		}
 		input "device_search", "bool", title: "Search for devices", required: true, description: "If false specify device index to use", defaultValue: true
 
@@ -56,7 +60,7 @@ def parse(String description) {
 }
 
 def installed() {
-	// Do nothing on install because a API key is required
+	// Do nothing on install because an API key is required
 }
 
 def refresh() {
@@ -73,7 +77,10 @@ def configure() {
 	if (! conversion) {
 		device.deleteCurrentState('conversion')
 	}
-
+	if (conversion != "US EPA" || ! hum_history || hum_history == "0") {
+		state.remove('HUMIDITY_HISTORY')
+	}
+	
 	if ( update_interval == "1" ) {
 		schedule('0 */1 * ? * *', 'refresh')
 	} else if ( update_interval == "5" ) {
@@ -107,17 +114,31 @@ def uninstalled() {
 }
 
 void sensorCheck() {
-	String url="https://api.purpleair.com/v1/sensors"
-	String particles = avg_period
+	final String URL="https://api.purpleair.com/v1/sensors"
+	String pm25_count = avg_period
 	if (conversion) {
-		particles = "pm2.5"
+		if (conversion == "lrapa" || conversion == "woodsmoke" || conversion == "CF=1") {
+			pm25_count="pm2.5_cf_1"
+		} else {
+			pm25_count = "pm2.5"
+		}
 	}
-	
-	String query_fields="name,${particles},latitude,longitude,confidence,pm1.0,pm2.5_alt,pm2.5_cf_1,pm10.0,humidity,voc,ozone1,position_rating"
+		
+	String query_fields="name,confidence"
+	if (conversion == "US EPA") {
+		query_fields+=",humidity,${pm25_count}"
+	} else {
+		query_fields+=",${pm25_count}"
+	}
+	if (weighted_avg) {
+		query_fields+=",latitude,longitude,position_rating"
+	}
+	//query_fields="name,latitude,longitude,position_rating,confidence,humidity,${pm25_count},pm10.0"
+		
 	Map httpQuery
 	Float[] coords
 	
-	if ( device_search ) {
+	if (device_search) {
 		coords = parseJson(search_coords)
 		Float[] dist2deg = distance2degrees(coords[0])
 		Float[] range = []
@@ -137,7 +158,7 @@ void sensorCheck() {
 	}
 
 	Map params = [
-		uri: url,
+		uri: URL,
 		headers: ['X-API-Key': X_API_Key],
 		query: httpQuery,
 		requestContentType: "application/json",
@@ -147,7 +168,7 @@ void sensorCheck() {
 	]
 
 	try {
-		asynchttpGet('httpResponse', params, [coords: coords, particles: particles])
+		asynchttpGet('httpResponse', params, [coords: coords, pm25_count: pm25_count])
 	} catch (SocketTimeoutException e) {
 		log.error("Connection to PurpleAir timed out.")
 	} catch (Exception e) {
@@ -157,17 +178,18 @@ void sensorCheck() {
 
 void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	Map RESPONSE_FIELDS = [:]
-	Integer aqiValue = -1
+	Integer aqi2_5Value = -1
+	Integer aqi10Value = -1
 	String[][] sensorData
 	String sites
 	List<Map> sensors = []
 	
-	/*****************************/
+	/*****************************
 	if (resp.getStatus() != 200 ) {
 		log.error "HTTP error from PurpleAir: " + resp.getStatus()
 		return
 	}
-	/*** Test backoff on error ***
+	/*** Test backoff on error ***/
 	String respMimetype = ''
 	if (resp.getHeaders() && resp.getHeaders()["Content-Type"]) {
 		respMimetype = resp.getHeaders()["Content-Type"].split(";")[0]
@@ -203,94 +225,103 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	// Set field lookup map
 	resp.getJson().fields.eachWithIndex{it,index-> RESPONSE_FIELDS[(it)] = index}
 	
+	//logDebug "resp: ${resp.getJson().data}"
+	
 	if ( device_search ) {
 		// Filter out lower quality devices
 		//sensorData = resp.getJson().data.findAll {it[RESPONSE_FIELDS["confidence"]] >= (confidenceThreshold as Integer) }
 		sensorData = resp.getJson().data.findAll {it[RESPONSE_FIELDS["confidence"]] >= 90}
 		if ( debugMode ) {
-			def dropped = resp.getJson().data.findAll {it[RESPONSE_FIELDS["confidence"]] < 90}
+			List confidence = sensorData.collect {['name': it[RESPONSE_FIELDS['name']], 'confidence': it[RESPONSE_FIELDS['confidence']].toInteger()]}
+			List dropped = confidence.findAll {it["confidence"] < 90}
+			//List dropped = resp.getJson().data.findAll {it[RESPONSE_FIELDS["confidence"]] < 90}
 			if ( dropped ) {
-				log.debug "Low confidence sensors dropped: ${dropped}"
+				logDebug "Sensor confidence: ${confidence}"
+				logDebug "Low confidence sensors dropped: ${dropped}"
 			}
 		}
 	} else {
 		sensorData = resp.getJson().data
 	}
-	
+		
 	// Some sensors don't return humidity, fill in missing data with avg from other devices
-	Float avg_humidity = sensorAverage(sensorData.collect {['humidity': Float.valueOf(it[RESPONSE_FIELDS['humidity']]?:0)]}, 'humidity')
-	if (avg_humidity == null) {
-		if (conversion == "US EPA") {
-			log.error 'No humidity returned from sites and "US EPA" conversion selected. US EPA requires humidity data, please choose another option!'
+	// Also detect broken humidity sensors by looking for ones that never change
+	// TODO: make function for this?
+	Map humidity_history = [:]
+	Integer avg_humidity = 50
+	if (conversion == "US EPA" && hum_history) {
+		humidity_history = state.HUMIDITY_HISTORY?:[:]
+
+		sensorData.each {humidityHistoryUpdate(humidity_history, it[RESPONSE_FIELDS['name']], Integer.valueOf(it[RESPONSE_FIELDS['humidity']]?:0))}
+		// This mess is collecting the average of only the functional humidity sensors
+		avg_humidity = Math.round(sensorAverage(sensorData.collect {['humidity': humidityDeviceUpdating(humidity_history, it[RESPONSE_FIELDS['name']])?it[RESPONSE_FIELDS['humidity']].toInteger():0]}, 'humidity')?:avg_humidity)
+		
+		if (avg_humidity == null) {
+			log.error 'No valid humidity data returned from sites and "US EPA" conversion selected. US EPA requires humidity data, please choose another option!'
 			return
-		} else {
-			log.debug "humidity null, but not required. setting to 0"
-			avg_humidity = 0.0
 		}
+
+		state.HUMIDITY_HISTORY = humidity_history
 	}
+	
+	//logDebug "RESPONSE_FIELDS: ${RESPONSE_FIELDS}"
 
 	// initialize sensor maps
-	Float[] sensor_coords
-	Float pm2_5_conv
+	// TODO: make function for this?
+    final int HUMIDITY_FUDGE = 4 // PurpleAir states humidity sensors are ~4% below ambiant humidity
+	Float[] sensor_coords = data.coords
+	Float pm25_conv
+	
 	sensorData.each {
-		sensor_coords = [Float.valueOf(it[RESPONSE_FIELDS['latitude']]), Float.valueOf(it[RESPONSE_FIELDS['longitude']])]
-		part_count_conv = apply_conversion(conversion?:"none", Float.valueOf(it[RESPONSE_FIELDS[data.particles]]), Float.valueOf(it[RESPONSE_FIELDS['pm2.5_cf_1']]), Float.valueOf(it[RESPONSE_FIELDS['humidity']]?:avg_humidity))
+		Integer this_humidity = (humidityDeviceUpdating(humidity_history, it[RESPONSE_FIELDS['name']])?it[RESPONSE_FIELDS['humidity']].toInteger():avg_humidity) + HUMIDITY_FUDGE
+		if (weighted_avg) {
+			sensor_coords = [it[RESPONSE_FIELDS['latitude']].toFloat(), it[RESPONSE_FIELDS['longitude']].toFloat()]
+		}
+		pm25_conv = apply_conversion(conversion?:"none", it[RESPONSE_FIELDS[data.pm25_count]].toFloat(), this_humidity)
 		sensors << [
 			'site': it[RESPONSE_FIELDS['name']],
-			'pm2_5': it[RESPONSE_FIELDS[data.particles]].toFloat(),
-			'pm2_5_conv': pm2_5_conv,
+			'pm25': it[RESPONSE_FIELDS[data.pm25_count]].toFloat(),
+			'pm25_conv': pm25_conv,
 			'confidence': it[RESPONSE_FIELDS['confidence']].toInteger(),
 			'distance': distance(data.coords, sensor_coords),
-			'position_rating': it[RESPONSE_FIELDS['position_rating']].toInteger(),
 			'coords': sensor_coords,
-			//'pm1.0': (it[RESPONSE_FIELDS['pm1.0']]?:0).toFloat(),
-			'pm2_5_alt': (it[RESPONSE_FIELDS['pm2.5_alt']]?:0).toFloat(),
-			'pm2_5_cf_1': (it[RESPONSE_FIELDS['pm2.5_cf_1']]?:0).toFloat(),
-			//'pm10.0': (it[RESPONSE_FIELDS['pm10.0']]?:0).toFloat(),
-			'voc': (it[RESPONSE_FIELDS['voc']]?:0).toFloat(),
-			'ozone': (it[RESPONSE_FIELDS['ozone1']]?:0).toFloat(),
+			'position_rating': RESPONSE_FIELDS['position_rating']?it[RESPONSE_FIELDS['position_rating']].toInteger():-1,
 			'humidity': this_humidity
 		]
 	}
 	if ( debugMode ) {
 		log.debug "coords: ${data.coords}"
 		log.debug "site: ${sensors.collect { it['site'] }}"
-		log.debug "particle ct query: ${data.particles}"
-		log.debug "pm2_5: ${sensors.collect { it['pm2_5'] }}"
-		log.debug "pm2_5_conv: ${sensors.collect { it['pm2_5_conv'] }}"
+		log.debug "particle ct query: ${data.pm25_count}"
 		log.debug "confidence: ${sensors.collect { it['confidence'] }}"
 		log.debug "humidity: ${sensors.collect { it['humidity'] }}"
-		//log.debug "pm1.0: ${sensors.collect { it['pm1.0'] }}"
-		log.debug "pm2_5_alt: ${sensors.collect { it['pm2_5_alt'] }}"
-		log.debug "pm2_5_cf_1: ${sensors.collect { it['pm2_5_cf_1'] }}"
-		//log.debug "pm10.0: ${sensors.collect { it['pm10.0'] }}"
-		log.debug "voc: ${sensors.collect { it['voc'] }}"
-		log.debug "ozone: ${sensors.collect { it['ozone'] }}"
-		log.debug "AQIs: ${sensors.collect { getPart2_5_AQI(it['pm2_5']) }}"
-		log.debug "AQIs (${conversion?:"none"}): ${sensors.collect { getPart2_5_AQI(it['pm2_5_conv']) }}"
+		log.debug "pm2.5: ${sensors.collect { it['pm25'] }}"
+		log.debug "pm2.5_conv: ${sensors.collect { it['pm25_conv'] }}"
+		log.debug "PM2.5 AQIs: ${sensors.collect { getPart2_5_AQI(it['pm25']) }}"
+		log.debug "PM2.5 AQIs (${conversion?:"none"}): ${sensors.collect { getPart2_5_AQI(it['pm25_conv']) }}"
 		log.debug "distance: ${sensors.collect { it['distance'] }}"
 		log.debug "position_rating: ${sensors.collect { it['position_rating'] }}"
 		if ( device_search ) {
-			log.debug "unweighted av aqi (${conversion?:"none"}): ${getPart2_5_AQI(sensorAverage(sensors, 'pm2_5_conv'))}"
-			log.debug "weighted av aqi (${conversion?:"none"}): ${getPart2_5_AQI(sensorAverageWeighted(sensors, 'pm2_5_conv', data.coords))}"
+			log.debug "unweighted av PM 2.5 aqi (${conversion?:"none"}): ${getPart2_5_AQI(sensorAverage(sensors, 'pm25_conv'))}"
+			log.debug "weighted av PM 2.5 aqi (${conversion?:"none"}): ${getPart2_5_AQI(sensorAverageWeighted(sensors, 'pm25_conv', data.coords))}"
 		}
 	}
 
 	if (! conversion) {
 		if ( weighted_avg && device_search) {
-			aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensors, 'pm2_5', data.coords))
+			aqi2_5Value = getPart2_5_AQI(sensorAverageWeighted(sensors, 'pm25', data.coords))
 		} else {
-			aqiValue = getPart2_5_AQI(sensorAverage(sensors, 'pm2_5'))
+			aqi2_5Value = getPart2_5_AQI(sensorAverage(sensors, 'pm25'))
 		}
 	} else {
 		if ( weighted_avg && device_search) {
-			aqiValue = getPart2_5_AQI(sensorAverageWeighted(sensors, 'pm2_5_conv', data.coords))
+			aqi2_5Value = getPart2_5_AQI(sensorAverageWeighted(sensors, 'pm25_conv', data.coords))
 		} else {
-			aqiValue = getPart2_5_AQI(sensorAverage(sensors, 'pm2_5_conv'))
+			aqi2_5Value = getPart2_5_AQI(sensorAverage(sensors, 'pm25_conv'))
 		}
 	}
 	
-	AQIcategory = getCategory(aqiValue)
+	AQIcategory = getCategory(aqi2_5Value)
 	
 	sites = sensors.collect { it['site'] }.sort()
 	//sites = sensorData.collect { it['site' }.sort().join(', ') // Remove brackets around sites?
@@ -305,14 +336,59 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		}
 		sendEvent(name: "category", value: AQIcategory, descriptionText: "${device.displayName} category is ${AQIcategory}")
 		if (conversion) {
-			sendEvent(name: "conversion", value: conversion, descriptionText: "AQI conversion algorithm is ${conversion}")
-			//sendEvent(name: "aqi", value: aqiValue, unit: "AQI (${conversion})", descriptionText: "${device.displayName} AQI level is ${aqiValue}")
-			sendEvent(name: "aqi", value: aqiValue, unit: "AQI (${conversion})", descriptionText: "${AQIcategory}")
+			sendEvent(name: "conversion", value: conversion, descriptionText: "PM 2.5 AQI conversion algorithm is ${conversion}")
+			//sendEvent(name: "aqi", value: aqi2_5Value, unit: "PM 2.5 AQI (${conversion})", descriptionText: "${device.displayName} AQI level is ${aqi2_5Value}")
+			sendEvent(name: "aqi", value: aqi2_5Value, unit: "PM 2.5 AQI (${conversion})", descriptionText: "${AQIcategory}")
 		} else {
-			//sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${device.displayName} AQI level is ${aqiValue}")
-			sendEvent(name: "aqi", value: aqiValue, unit: "AQI", descriptionText: "${AQIcategory}")
+			//sendEvent(name: "aqi", value: aqi2_5Value, unit: "PM 2.5 AQI", descriptionText: "${device.displayName} AQI level is ${aqi2_5Value}")
+			sendEvent(name: "aqi", value: aqi2_5Value, unit: "PM 2.5 AQI", descriptionText: "${AQIcategory}")
 		}
 	}
+}
+
+void humidityHistoryUpdate(Map history, String site, Integer val) {
+	String hr = (new Date())[Calendar.HOUR].toString()
+
+	if ( history.containsKey(site) ) {
+		history[(site)][(hr)] = val
+	} else {
+		history[(site)] = [(hr): val]
+	}
+}
+
+Boolean humidityDeviceUpdating(Map history, String site) {
+	final int MIN_HISTORY = 3
+	Integer hr = (new Date())[Calendar.HOUR]
+	
+	if (! history.containsKey(site) ) {
+		return null
+	}
+	
+	String last_hr
+	Integer last_val = 0
+	for (int i = 0; i <= 11; i++) {
+		last_hr = ((hr + 12 - i) % 12).toString()
+		//history[(site)].each { logDebug "${it.key}"; q(it.key)}
+		if ( history[(site)][(last_hr)] ) {
+			last_val = history[(site)][(last_hr)]
+			break
+		}
+	}
+	//logDebug "last_val: ${last_val}"
+	
+	if (last_val == 0) {
+		logDebug "${site} hum offline"
+		return false
+	} else if ( history[(site)].size() < MIN_HISTORY ) {
+		logDebug "${site} hum passing. insufficient history"
+		return true
+	}
+	
+	if (! history[(site)].any {it.value != last_val} ) {
+		logDebug "${site} hum not updating ${history[(site)]}"
+	}
+	
+	return history[(site)].any {it.value != last_val}
 }
 
 Float sensorAverage(List<Map> sensors, String field) {
@@ -329,11 +405,11 @@ Float sensorAverage(List<Map> sensors, String field) {
 	if (sum > 0) {
 		return sum / count
 	} else {
+		log.warn "sensorAverage: No data for field '${field}'"
 		return null
 	}
 }
 
-// TODO: Use position_rating as multiplier to weight accurate positions more
 Float sensorAverageWeighted(List<Map> sensors, String field, Float[] coords) {
 	Float count = 0.0
 	Float sum = 0.0
@@ -350,32 +426,57 @@ Float sensorAverageWeighted(List<Map> sensors, String field, Float[] coords) {
 	sensors.eachWithIndex { it, i ->
 		Float val = it[field]
 		Float weight = nearest / Math.sqrt(distances[i]) * (it['position_rating']+1)
-		sum = sum + val * weight
-		count = count + weight
+		sum += val * weight
+		count += weight
 	}
-	// if ( debugMode ) log.debug "weights: ${weights}"
-	// if ( debugMode ) log.debug "distances: ${distances}"
+	// logDebug "weights: ${weights}"
+	// logDebug "distances: ${distances}"
 	return sum / count
 }
 
-// getAQI and AQILinear functions from https://www.airnow.gov/aqi/aqi-calculator/
+// getAQI and AQILinear functions from https://www.airnow.gov/aqi/aqi-calculator
+// (https://www.airnow.gov/sites/default/files/custom-js/conc-aqi.js)
 Integer getPart2_5_AQI(Float partCount) {
-	if ( partCount >= 0 && partCount < 12.1 ) {
-		return AQILinear(50,0,12,0,partCount)
-	} else if ( partCount >= 12.1 && partCount < 35.5 ) {
-		return AQILinear(100,51,35.4,12.1,partCount)
-	} else if ( partCount >= 35.5 && partCount < 55.5 ) {
-		return AQILinear(150,101,55.4,35.5,partCount)
-	} else if ( partCount >= 55.5 && partCount < 150.5 ) {
-		return AQILinear(200,151,150.4,55.5,partCount)
-	} else if ( partCount >= 150.5 && partCount < 250.5 ) {
-		return AQILinear(300,201,250.4,150.5,partCount)
-	} else if ( partCount >= 250.5 && partCount < 350.5 ) {
-		return AQILinear(400,301,350.4,250.5,partCount)
-	} else if ( partCount >= 350.5 && partCount < 500.5 ) {
-		return AQILinear(500,401,500.4,350.5,partCount)
-	} else if ( partCount >= 500.5 ) {
-		return Math.round(partCount)
+	Float c = Math.floor(10*partCount)/10
+	if ( c >= 0 && c < 12.1 ) {
+		return AQILinear(50,0,12,0,c)
+	} else if ( c >= 12.1 && c < 35.5 ) {
+		return AQILinear(100,51,35.4,12.1,c)
+	} else if ( c >= 35.5 && c < 55.5 ) {
+		return AQILinear(150,101,55.4,35.5,c)
+	} else if ( c >= 55.5 && c < 150.5 ) {
+		return AQILinear(200,151,150.4,55.5,c)
+	} else if ( c >= 150.5 && c < 250.5 ) {
+		return AQILinear(300,201,250.4,150.5,c)
+	} else if ( c >= 250.5 && c < 350.5 ) {
+		return AQILinear(400,301,350.4,250.5,c)
+	} else if ( c >= 350.5 && c < 500.5 ) {
+		return AQILinear(500,401,500.4,350.5,c)
+	} else if ( c >= 500.5 ) {
+		return Math.round(c)
+	} else {
+		return -1
+	}
+}
+
+Integer getPart10_AQI(Float partCount) {
+	Float c = Math.floor(partCount);
+	if (c>=0 && c<55) {
+		return AQILinear(50,0,54,0,c);
+	} else if (c>=55 && c<155) {
+		return AQILinear(100,51,154,55,c);
+	} else if (c>=155 && c<255) {
+		return AQILinear(150,101,254,155,c);
+	} else if (c>=255 && c<355) {
+		return AQILinear(200,151,354,255,c);
+	} else if (c>=355 && c<425) {
+		return AQILinear(300,201,424,355,c);
+	} else if (c>=425 && c<505) {
+		return AQILinear(400,301,504,425,c);
+	} else if (c>=505 && c<605) {
+		return AQILinear(500,401,604,505,c);
+	} else if ( c >= 605 ) {
+		return Math.round(c)
 	} else {
 		return -1
 	}
@@ -406,15 +507,15 @@ String getCategory(Integer AQI) {
 	}
 }
 
-Float apply_conversion(String conversion, Float PM25, Float PM25_cf_1, Float RH) {
+Float apply_conversion(String conversion, Float PM25, Float RH) {
 	if ( conversion == "US EPA" ) {
 		return us_epa_conversion(PM25, RH)
 	} else if ( conversion == "Woodsmoke" ) {
-		return woodsmoke_conversion(PM25_cf_1)
+		return woodsmoke_conversion(PM25)
 	} else if ( conversion == "AQ and U" ) {
 		return AQandU_conversion(PM25)
 	} else if ( conversion == "LRAPA" ) {
-		return lrapa_conversion(PM25_cf_1)
+		return lrapa_conversion(PM25)
 	} else {
 		return PM25
 	}
@@ -433,21 +534,25 @@ Float us_epa_conversion(Float PM, Float RH) {
 	//
 	// Source: https://cfpub.epa.gov/si/si_public_record_report.cfm?dirEntryId=353088&Lab=CEMM
 	// PDF, p26
+	
+	Float c
+	
 	if ( PM < 30 ) {
-		return 0.524 * PM - 0.0862 * RH + 5.75
+		c = 0.524 * PM - 0.0862 * RH + 5.75
 	} else if ( PM < 50 ) {
-		return (0.786 * (PM/20 - 3/2) + 0.524 * (1 - (PM/20 - 3/2))) * PM -0.0862 * RH + 5.75
+		c = (0.786 * (PM/20 - 3/2) + 0.524 * (1 - (PM/20 - 3/2))) * PM -0.0862 * RH + 5.75
 	} else if ( PM < 210 ) {
-		return 0.786 * PM - 0.0862 * RH + 5.75
+		c = 0.786 * PM - 0.0862 * RH + 5.75
 	} else if ( PM < 260 ) {
-		Float y = 0.69*(PM/50 - 21/5) + 0.786*(1 - (PM/50 - 21/5))
-		y = y*PM - 0.0862*RH * (1 - (PM/50 - 21/5))
-		y = y + 2.966*(PM/50 - 21/5) + 5.75*(1 - (PM/50 - 21/5))
-		y = y + 8.84*(10**(-4))*PM**2*(PM/50 - 21/5)
-		return y
+		c = 0.69*(PM/50 - 21/5) + 0.786*(1 - (PM/50 - 21/5))
+		c = c*PM - 0.0862*RH * (1 - (PM/50 - 21/5))
+		c = c + 2.966*(PM/50 - 21/5) + 5.75*(1 - (PM/50 - 21/5))
+		c = c + 8.84*(10**(-4))*PM**2*(PM/50 - 21/5)
 	} else {
-		return 2.966 + 0.69*x + 8.84*(10**(-4))*(PM**2)
+		c = 2.966 + 0.69*x + 8.84*(10**(-4))*(PM**2)
 	}
+	
+	return (c >= 0)?c:0
 }
 
 Float woodsmoke_conversion(Float PM) {
@@ -468,10 +573,9 @@ Float lrapa_conversion(Float PM) {
 	// Source: map.purpleair.com
 	//
 	// Deprecated? per https://www.lrapa.org/aqi101/
-	return 0.5 * PM - 0.66
+	Float c = 0.5 * PM - 0.66
+	return (c >= 0)?c:0
 }
-
-// PM_ALT ("pm2.5_alt", availble from api)
 
 Float distance(Float[] coorda, Float[] coordb) {
 	if ( coorda == null || coordb == null ) return 0.0
@@ -495,4 +599,8 @@ Float[] distance2degrees(Float latitude) {
 	Float longMilesPerDegree = 68.972
 	
 	return [latMilesPerDegree, longMilesPerDegree]
+}
+
+void logDebug(String s) {
+	if ( debugMode ) log.debug s
 }
