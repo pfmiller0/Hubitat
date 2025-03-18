@@ -52,19 +52,19 @@ preferences {
 	}
 	section("<b>Temperature control</b>") {
 		input "tempTargetCooling", "decimal", title: "Target temperature (Cooling)", width: 6, defaultValue: 69
-		input "tempTargetHeating", "decimal", title: "Target temperature (Heating)", width: 6, defaultValue: 71
-		input "tempMode", "enum", title: "Mode", options: ["Cooling", "Heating", "Auto"], description: "Enter mode", defaultValue: "Auto"
-		input "tempAutoModeChangeThreshold", "decimal", title: "Auto mode change threshold", defaultValue: 5
+		input "tempTargetHeating", "decimal", title: "Target temperature (Heating)", width: 6, defaultValue: 71, newLineAfter: true
+		input "tempMode", "enum", title: "Mode", options: ["Cooling", "Heating", "Auto"], description: "Enter mode", defaultValue: "Auto", width: 6, newLineAfter: true
+		input "tempAutoModeChangeThreshold", "decimal", title: "Auto mode change threshold", width: 6, defaultValue: 5, newLineAfter: true
 		input "tempAfternoonAdjust", "decimal", title: "Afternoon temperature adjustment", width: 6, defaultValue: 3
 		input "tempHeatAdjust", "decimal", title: "Heating mode temperature adjustment", width: 6, defaultValue: 3
 	}
 
 	section("<b>Devices</b>") {
-		input "thermoIn", "capability.temperatureMeasurement", title: "Indoor temperature", multiple: true
-		input "thermoOut", "capability.temperatureMeasurement", title: "Outdoor temperature", multiple: true
-		input "switchFans", "capability.switch", title: "Window fans", multiple: true
-		input "windowControl", "capability.contactSensor", title: "Window sensor (disable if open)", required: false, hideWhenEmpty: true
-		input "switchControl", "capability.switch", title: "Thermostat enabled", required: false
+		input "thermoIn", "capability.temperatureMeasurement", title: "Indoor temperature${Double.isNaN(tempAverage(thermoIn))?'':' (' + tempAverage(thermoIn) + ')'}", multiple: true, width: 6, submitOnChange: true
+		input "thermoOut", "capability.temperatureMeasurement", title: "Outdoor temperature${Double.isNaN(tempAverage(thermoOut))?'':' (' + tempAverage(thermoOut) + ')'}", multiple: true, width: 6, newLineAfter: true
+		input "switchFans", "capability.switch", title: "Window fans", multiple: true, width: 6
+		input "windowControl", "capability.contactSensor", title: "Window sensor (disable if open)", required: false, hideWhenEmpty: true, width: 6, newLineAfter: true
+		input "switchControl", "capability.switch", title: "Thermostat enabled", required: false, width: 6
 	}
 
 	section("<b>Debug</b>") {
@@ -82,6 +82,7 @@ void installed() {
 }
 
 void updated() {
+	resetAppLabel()
 	unsubscribe()
 	initialize()
 	logDebug "Updated: $settings"
@@ -89,8 +90,6 @@ void updated() {
 
 void initialize() {
 	if (isPaused == false) {
-		resetAppLabel()
-
 		state.timeLastChange = state.timeLastChange ?: 0
 		state.tempModeActive = state.tempModeActive ?: "Cooling"
 		
@@ -107,7 +106,7 @@ void initialize() {
 		
 		temperatureHandler()
 	} else {
-		addAppLabel("Paused", "red")
+		addAppLabel("(Paused)", "red")
 	}
 }
 
