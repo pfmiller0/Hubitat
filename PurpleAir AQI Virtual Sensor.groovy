@@ -7,7 +7,7 @@
 
 import groovy.transform.Field
 
-@Field final static String VERSION = "1.3.0"
+@Field final static String VERSION = "1.3.2"
 
 metadata {
 	definition (
@@ -31,7 +31,7 @@ metadata {
 
 	preferences {
 		input "X_API_Key", "text", title: "PurpleAir API key", required: true, description: "Contact contact@purpleair.com to request an API key"
-		input "update_interval", "enum", title: "Update interval", required: true, options: [["1": "1 min"], ["5": "5 min"], ["10": "10 min"], ["15": "15 min"], ["30": "30 min"], ["60": "1 hr"], ["180": "3 hr"]], defaultValue: "60"
+		input "update_interval", "enum", title: "Update interval", required: true, options: [["1": "1 min"], ["5": "5 min"], ["10": "10 min"], ["15": "15 min"], ["30": "30 min"], ["60": "1 hr"], ["180": "3 hr"], ["0": "disabled"]], defaultValue: "60"
 		input "conversion", "enum", title: "Apply conversion", required: false, description: "See map.purpleair.com for details", options: [["US EPA": "US EPA"], ["Woodsmoke": "Woodsmoke"], ["AQ&U": "AQ&U"], ["CF=1": "CF=1"], ["LRAPA": "LRAPA"]]
 		if (! conversion) {
 			input "avg_period", "enum", title: "Averaging period", required: true, description: "Readings averaged over what time", options: [["pm2.5": "1 min"], ["pm2.5_10minute": "10 mins"], ["pm2.5_30minute": "30 mins"], ["pm2.5_60minute": "1 hour"], ["pm2.5_6hour": "6 hours"], ["pm2.5_24hour": "1 day"], ["pm2.5_1week": "1 week"]], defaultValue: "pm2.5_60minute"
@@ -95,6 +95,8 @@ def configure() {
 		runEvery1Hour('refresh')
 	} else if ( update_interval == "180" ) {
 		runEvery3Hours('refresh')
+	} else if ( update_interval == "0" ) {
+		unschedule()
 	} else {
 		log.error "Invalid update_interval"
 		runEvery1Hour('refresh')
@@ -124,16 +126,13 @@ void sensorCheck() {
 		}
 	}
 		
-	String query_fields="name,confidence"
+	String query_fields="name,confidence,${pm25_count}"
 	if (conversion == "US EPA") {
-		query_fields+=",humidity,${pm25_count}"
-	} else {
-		query_fields+=",${pm25_count}"
+		query_fields+=",humidity"
 	}
 	if (weighted_avg) {
 		query_fields+=",latitude,longitude,position_rating"
 	}
-	//query_fields="name,latitude,longitude,position_rating,confidence,humidity,${pm25_count},pm10.0"
 		
 	Map httpQuery
 	Float[] coords
@@ -191,13 +190,13 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	}
 	/*** Test backoff on error ***/
 	String respMimetype = ''
-	if (resp.getHeaders() && resp.getHeaders()["Content-Type"]) {
-		respMimetype = resp.getHeaders()["Content-Type"].split(";")[0]
+	if (resp.getHeaders() && resp.getHeaders()["content-type"]) {
+		respMimetype = resp.getHeaders()["content-type"].split(";")[0]
 	}
 
 	if (resp.getStatus() != 200 || respMimetype != "application/json" ) {
 		if (respMimetype != "application/json" ) {
-			log.error "Response type '${respMimetype}', JSON expected"
+			log.error "Response type: '${respMimetype}', JSON expected"
 		}
 		state.failCount = state.failCount?:0 + 1
 		unschedule('refresh')
@@ -272,22 +271,29 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	Float[] sensor_coords = data.coords
 	Float pm25_conv
 	
+	//log.debug(sensorData)
 	sensorData.each {
 		Integer this_humidity = (humidityDeviceUpdating(humidity_history, it[RESPONSE_FIELDS['name']])?it[RESPONSE_FIELDS['humidity']].toInteger():avg_humidity) + HUMIDITY_FUDGE
 		if (weighted_avg) {
 			sensor_coords = [it[RESPONSE_FIELDS['latitude']].toFloat(), it[RESPONSE_FIELDS['longitude']].toFloat()]
 		}
 		pm25_conv = apply_conversion(conversion?:"none", it[RESPONSE_FIELDS[data.pm25_count]].toFloat(), this_humidity)
-		sensors << [
-			'site': it[RESPONSE_FIELDS['name']],
-			'pm25': it[RESPONSE_FIELDS[data.pm25_count]].toFloat(),
-			'pm25_conv': pm25_conv,
-			'confidence': it[RESPONSE_FIELDS['confidence']].toInteger(),
-			'distance': distance(data.coords, sensor_coords),
-			'coords': sensor_coords,
-			'position_rating': RESPONSE_FIELDS['position_rating']?it[RESPONSE_FIELDS['position_rating']].toInteger():-1,
-			'humidity': this_humidity
-		]
+		
+		//log.debug("${it[RESPONSE_FIELDS['name']]} ${it[RESPONSE_FIELDS[data.pm25_count]]}")
+		if (! it[RESPONSE_FIELDS[data.pm25_count]]) {
+			log.error("${it[RESPONSE_FIELDS['name']]} has no pm25 data")
+		} else {
+			sensors << [
+				'site': it[RESPONSE_FIELDS['name']],
+				'pm25': it[RESPONSE_FIELDS[data.pm25_count]].toFloat(),
+				'pm25_conv': pm25_conv,
+				'confidence': it[RESPONSE_FIELDS['confidence']].toInteger(),
+				'distance': distance(data.coords, sensor_coords),
+				'coords': sensor_coords,
+				'position_rating': RESPONSE_FIELDS['position_rating']?it[RESPONSE_FIELDS['position_rating']].toInteger():-1,
+				'humidity': this_humidity
+			]
+		}
 	}
 	if ( debugMode ) {
 		log.debug "coords: ${data.coords}"
@@ -405,8 +411,8 @@ Float sensorAverage(List<Map> sensors, String field) {
 	if (sum > 0) {
 		return sum / count
 	} else {
-		log.warn "sensorAverage: No data for field '${field}'"
-		return null
+		log.warn "sensorAverage: Site ${sensors.site} field '${field}' is 0.0"
+		return 0
 	}
 }
 
@@ -431,7 +437,12 @@ Float sensorAverageWeighted(List<Map> sensors, String field, Float[] coords) {
 	}
 	// logDebug "weights: ${weights}"
 	// logDebug "distances: ${distances}"
-	return sum / count
+	if (sum > 0) {
+		return sum / count
+	} else {
+		log.warn "sensorAverageWeighted: Site ${sensors.site} field '${field}' is 0.0"
+		return 0
+	}
 }
 
 // getAQI and AQILinear functions from https://www.airnow.gov/aqi/aqi-calculator
@@ -549,7 +560,7 @@ Float us_epa_conversion(Float PM, Float RH) {
 		c = c + 2.966*(PM/50 - 21/5) + 5.75*(1 - (PM/50 - 21/5))
 		c = c + 8.84*(10**(-4))*PM**2*(PM/50 - 21/5)
 	} else {
-		c = 2.966 + 0.69*x + 8.84*(10**(-4))*(PM**2)
+		c = 2.966 + 0.69*PM + 8.84*(10**(-4))*(PM**2)
 	}
 	
 	return (c >= 0)?c:0
