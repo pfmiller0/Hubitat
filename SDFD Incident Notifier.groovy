@@ -12,6 +12,7 @@ definition(
 	parent: "hyposphere.net:P's Utilities",
 	author: "Peter Miller",
 	description: "Retrieve SDFD incidents, and provide notification for local incidents.",
+	menu: "apps",
 	iconUrl: "",
 	iconX2Url: "",
 	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/SDFD%20Incident%20Notifier.groovy"
@@ -48,20 +49,20 @@ preferences {
 	}
 }
 
-//List<String> IGNORE_INC() { ["Medical", "Advised Incident", "CAD Test", "Carbon Monoxide Alarm", "DMS", "Drill", "Duty Mechanic", "Elevator Rescue", "Facilities", "Lock in/out", "Logistics", "Medical Alert Alarm", "Move Up", "Page", "RAP", "Ringing Alarm", "Special Service", "Truck - Special Service", "yGT General Transport"] }
-List<String> IGNORE_INC() { ["Medical", "CAD Test", "Carbon Monoxide Alarm", "DMS", "Duty Mechanic", "Elevator Rescue", "Facilities", "Logistics", "Lock in/out", "Medical Alert Alarm", "Move Up", "RAP", "Ringing Alarm", "Special Service", "STAND BACK HOLD", "Traffic Accident FWY", "Traffic Accident (L1)",
-							 "Truck - Special Service", "yGT General Transport"] }
-List<String> REDUNDANT_TYPES() { ["Advised Incident (misc.)", "Alert 1", "Alert 2 Brn/Mont", "Alert 2 Still Alarm", "Fuel in Bilge", "Gaslamp", "Hazmat", "MTZ - Vegetaton Inital Attack", "Medical Multi-casualty", "Nat Gas Leak BB", "Nat Gas SING ENG SDGE", "Pump Truck", "Rescue", "Single Engine Response", "Single Resource", "Structure Commercial", "Traffic Accident Freeway (NC)", "Traffic Accidents", "TwoEngines", "Vegetation NO Special Response", "Vehicle vs. Structure"] }
-List<String> NO_NOTIFICATION_TYPES() { ["Extinguished Fire", "Ringing Alarm Highrise", "Traffic Accident FWY", "Vehicle Fire Freeway"] }
-List<String> AMBULANCE_UNITS() { ["M", "BLS", "SDGE"] } // Add MS?
+List<String> ALWAYS_NOTIFY_TYPES() { ["ASHER [Active Shooter]", "Ship Fire (Cruise/USS)"] }
+List<String> IGNORE_INC() { ["Medical", "CAD Test", "Carbon Monoxide Alarm", "DMS", "Duty Mechanic", "Elevator Rescue", "Facilities", "Lift Assist", "Lock in/out", "Logistics", "Medical Alert Alarm", "Move Up", "Page", "RAP", "Ringing Alarm", "Special Service", "STAND BACK HOLD", "Truck - Special Service",
+							 "yGT General Transport"] }
+List<String> REDUNDANT_TYPES() { ["Advised Incident (misc.)", "Alert 1", "Alert 2 Brn/Mont", "Alert 2 Still Alarm", "Fuel in Bilge", "Gaslamp", "Hazmat", "MTZ - Vegetaton Inital Attack", "Medical Multi-casualty", "Nat Gas Leak BB", "Nat Gas SING ENG SDGE", "Pump Truck", "Rescue", "Ship Fire (Cruise/USS)", "Single Engine Response", "Single Resource", "Structure Commercial", "Traffic Accident Freeway (NC)", "Traffic Accidents", "TwoEngines", "Vegetation NO Special Response", "Vehicle vs. Structure"] }
+List<String> NO_NOTIFICATION_TYPES() { ["Extinguished Fire", "Ringing Alarm Highrise", "Traffic Accident FWY", "Traffic Accident (L1)", "Vehicle Fire Freeway"] }
+List<String> AMBULANCE_UNITS() { ["M", "BLS", "SDGE"] }
 
 void INCIDENT_UNIT_CHECK(List<Map> incidents) {
-	inc_types= ["Truck - Special Service", "yGT General Transport"]
+	inc_types= ["yGT General Transport"]
 		
 	incidents.each { inc ->
 		// Drop incidents with no units or IncidentNumber
 		if (inc_types.any {it == inc.CallType}) {
-			log.debug "Units for ${inc.CallType}: ${inc.Units*.Code.sort()}"
+			log.error "Units for ${inc.CallType}: ${inc.Units*.Code.sort()}"
 		}
 	}
 }
@@ -99,7 +100,7 @@ void initialize() {
 			state.failCount = state.failCount ?: 0
 		}
 
-		schedule('0 */' + update_interval + ' * ? * *', 'incidentCheck')
+		schedule('5 */' + update_interval + ' * ? * *', 'incidentCheck')
 		
 		incidentCheck()
 	}
@@ -147,9 +148,10 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 
 	/***** Backoff on error *****/
 	if (resp.getStatus() != 200 || respMimetype != "application/json") {
-        if (respMimetype != "application/json" ) {
-            log.error "Response type '${respMimetype}', JSON expected"
-        }
+        //if (respMimetype != "application/json" ) {
+        //    log.error "Response type '${respMimetype}', JSON expected"
+        //}
+		//log.debug "HTTP error, Retry-After: ${resp.getHeaders()["Retry-After"]}"
         state.failCount++
 		unschedule('incidentCheck')
 		if (state.failCount <= 4 ) {
@@ -171,20 +173,19 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 			}
 			state.failCount = 0
 			unschedule('incidentCheck')
-            schedule('0 */' + update_interval + ' * ? * *', 'incidentCheck')
+			schedule('5 */' + update_interval + ' * ? * *', 'incidentCheck')
 		}
 	}
     	
 	try {
 		INCIDENT_UNIT_CHECK(resp.getJson())
+		// reorganize incident data -> remove ignored types -> remove medical incidents
+		allIncidents = filterMedIncidents(filterIncidentType(cleanupList(resp.getJson()), IGNORE_INC()), AMBULANCE_UNITS())
+		activeIncidents = state.activeIncidents ?: []
 	} catch (groovy.json.JsonException e) {
 		log.error "Invalid json returned"
 		return
 	}
-
-	// reorganize incident data -> remove ignored types -> remove medical incidents
-	allIncidents = filterMedIncidents(filterIncidentType(cleanupList(resp.getJson()), IGNORE_INC()), AMBULANCE_UNITS())
-	activeIncidents = state.activeIncidents ?: []
 	
 	// Get and log resolved incidents
 	resolvedIncidents = getResolvedIncidents(allIncidents, activeIncidents)
@@ -212,16 +213,15 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 			newIncidents[i].lng = coords[1]
 			newIncidents[i].DistMiles = getDistance(coords, [location.latitude, location.longitude])
 		}
-	}
-	
-	if (newIncidents) {
+
 		activeIncidents.addAll(newIncidents)
 		
 		logIncidents(newIncidents, "NEW")
 				
 		// Get incidents for notification
 		newIncidents = filterIncidentType(newIncidents, NO_NOTIFICATION_TYPES())
-		newIncidents = getLocalIncidents(newIncidents, notifyUnits)
+		// TODO: Don't filter ALWAYS_NOTIFY_TYPES
+		newIncidents = getLocalIncidents(newIncidents, notifyUnits, ALWAYS_NOTIFY_TYPES())
 		
 		if (newIncidents && notifyDevice) notifyDevice.deviceNotification incidentsToStr(newIncidents, "MIN")	
 	}
@@ -248,8 +248,8 @@ boolean unitCalled(Map<String, List> incident, String unit) {
 }
 
 List<Map> getLocalIncidents(List<Map> incidents, String localUnit) {
-	return incidents.findAll {
-		it.DistMiles ? it.DistMiles < notifyDist : unitCalled(it, localUnit)
+	return incidents.findAll { inc ->
+		inc.DistMiles ? inc.DistMiles < notifyDist : unitCalled(inc, localUnit)
 	}
 }
 
@@ -273,8 +273,8 @@ List<Map> cleanupList(List<Map> incidents) {
 			}
 		}
 	}
-	//log.debug "size: ${incidents.size()}, clean: ${cleanInc.size()}"
 	
+	//log.debug "size: ${incidents.size()}, clean: ${cleanInc.size()}"	
 	return cleanInc
 }
 
@@ -407,7 +407,7 @@ void logIncidents(List<Map> incidents, String LogType) {
 			log.error "logIncidents: Invalid option: $LogType"
 		}
 		
-		sendEvent(name: incName, value: "$inc.IncidentNumber<br><i>$incTime</i>", descriptionText: incDesc) 
+		sendEvent(name: incName, value: "$inc.IncidentNumber - $incTime", descriptionText: incDesc) 
 	}
 }
 
