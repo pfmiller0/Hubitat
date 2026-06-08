@@ -19,9 +19,6 @@ definition(
 )
 
 preferences {
-	section() {
-		input "isPaused", "bool", title: "Pause app", defaultValue: false
-	}
 	if (state.activeIncidents != null) {
 		section("<b>Active Incidents</b>") {
 			if (state.failCount > 0 ) {
@@ -49,10 +46,10 @@ preferences {
 	}
 }
 
-List<String> ALWAYS_NOTIFY_TYPES() { ["ASHER [Active Shooter]", "Ship Fire (Cruise/USS)"] }
-List<String> IGNORE_INC() { ["Medical", "CAD Test", "Carbon Monoxide Alarm", "DMS", "Duty Mechanic", "Elevator Rescue", "Facilities", "Lift Assist", "Lock in/out", "Logistics", "Medical Alert Alarm", "Move Up", "Page", "RAP", "Ringing Alarm", "Special Service", "STAND BACK HOLD", "Truck - Special Service",
-							 "yGT General Transport"] }
-List<String> REDUNDANT_TYPES() { ["Advised Incident (misc.)", "Alert 1", "Alert 2 Brn/Mont", "Alert 2 Still Alarm", "Fuel in Bilge", "Gaslamp", "Hazmat", "MTZ - Vegetaton Inital Attack", "Medical Multi-casualty", "Nat Gas Leak BB", "Nat Gas SING ENG SDGE", "Pump Truck", "Rescue", "Ship Fire (Cruise/USS)", "Single Engine Response", "Single Resource", "Structure Commercial", "Traffic Accident Freeway (NC)", "Traffic Accidents", "TwoEngines", "Vegetation NO Special Response", "Vehicle vs. Structure"] }
+List<String> ALWAYS_NOTIFY_TYPES() { ["ASHER [Active Shooter]", "Boat Fire", "Boat Fire 1st Alm", "Ship Fire (Cruise/USS)"] }
+List<String> IGNORE_INC() { ["Medical", "C2C - CHECK COMMENTS (RCIP)", "CAD Test", "Carbon Monoxide Alarm", "DMS", "Duty Mechanic", "Elevator Rescue", "Facilities", "Lift Assist", "Lock in/out", "Logistics", "Medical Alert Alarm", "Move Up", "Page", "RAP", "Ringing Alarm", "Special Service", "STAND BACK HOLD", "Truck - Special Service",
+							 "yGT General Transport", "Water Rescue 1 & 0"] }
+List<String> REDUNDANT_TYPES() { ["1a Medical Aid 1a", "Advised Incident (misc.)", "Alert 1", "Alert 2 Brn/Mont", "Alert 2 Still Alarm", "Fuel in Bilge", "Gaslamp", "Hazmat", "Medical Aid O", "MTZ - Vegetaton Inital Attack", "Medical Multi-casualty", "Nat Gas Leak BB", "Nat Gas SING ENG SDGE", "Pump Truck", "Rescue", "Ship Fire (Cruise/USS)", "Single Engine Response", "Single Resource", "Structure Commercial", "Traffic Accident Freeway (NC)", "Traffic Accidents", "TwoEngines", "Vegetation NO Special Response", "Vehicle vs. Structure"] }
 List<String> NO_NOTIFICATION_TYPES() { ["Extinguished Fire", "Ringing Alarm Highrise", "Traffic Accident FWY", "Traffic Accident (L1)", "Vehicle Fire Freeway"] }
 List<String> AMBULANCE_UNITS() { ["M", "BLS", "SDGE"] }
 
@@ -93,17 +90,15 @@ void updated() {
 }
 
 void initialize() {
-	if (! isPaused) {
-		if (debugMode) {
-			state.activeIncidents = []
-		} else {
-			state.failCount = state.failCount ?: 0
-		}
-
-		schedule('5 */' + update_interval + ' * ? * *', 'incidentCheck')
-		
-		incidentCheck()
+	if (debugMode) {
+		state.activeIncidents = []
+	} else {
+		state.failCount = state.failCount ?: 0
 	}
+
+	schedule('5 */' + update_interval + ' * ? * *', 'incidentCheck')
+
+	incidentCheck()
 }
 
 def uninstalled() {
@@ -247,9 +242,17 @@ boolean unitCalled(Map<String, List> incident, String unit) {
 	return incident.Units.any { it == unit }
 }
 
-List<Map> getLocalIncidents(List<Map> incidents, String localUnit) {
+List<Map> getLocalIncidents(List<Map> incidents, String localUnit, List<String> always_notify_types) {
 	return incidents.findAll { inc ->
-		inc.DistMiles ? inc.DistMiles < notifyDist : unitCalled(inc, localUnit)
+		if (always_notify_types.any {type -> type == inc.CallType }) {
+			log.debug("Forced notify: ${inc.CallType}")
+			return true
+		}
+		if (inc.DistMiles) {
+			return inc.DistMiles < notifyDist
+		} else {
+			return unitCalled(inc, localUnit)
+		}
 	}
 }
 
