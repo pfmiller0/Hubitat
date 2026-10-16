@@ -7,7 +7,7 @@
 
 import groovy.transform.Field
 
-@Field final static String VERSION = "1.3.2"
+@Field final static String VERSION = "1.4"
 
 metadata {
 	definition (
@@ -21,9 +21,14 @@ metadata {
 		capability "Polling"
 		capability "Initialize"
 
+		attribute "pm25", "number"
 		attribute "aqi", "number"
+		attribute "carbonDioxide", "number"
+		attribute "humidity", "number"
+		attribute "temperature", "number"
 		attribute "conversion", "string" // Conversion algorithm
 		attribute "category", "string" // Description of current air quality
+		attribute "airQuality", "string" // Not used yet, migrate to use this instead of "category"
 		attribute "sites", "string" // List of sensor sites used
 
 		command "refresh"
@@ -117,6 +122,12 @@ def uninstalled() {
 
 void sensorCheck() {
 	final String URL="https://api.purpleair.com/v1/sensors"
+	
+	if (! X_API_Key) {
+		log.warn("No API key. skipping refresh")
+		return
+	}
+	
 	String pm25_count = avg_period
 	if (conversion) {
 		if (conversion == "lrapa" || conversion == "woodsmoke" || conversion == "CF=1") {
@@ -191,7 +202,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	/*** Test backoff on error ***/
 	String respMimetype = ''
 	if (resp.getHeaders() && resp.getHeaders()["content-type"]) {
-		respMimetype = resp.getHeaders()["content-type"].split(";")[0]
+		respMimetype = resp.getHeaders()['Content-Type']?.toString()?.split(';')[0]?.split(' ')[1]
 	}
 
 	if (resp.getStatus() != 200 || respMimetype != "application/json" ) {
@@ -332,22 +343,24 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 	sites = sensors.collect { it['site'] }.sort()
 	//sites = sensorData.collect { it['site' }.sort().join(', ') // Remove brackets around sites?
 	
+	sendRepeatedEvents = true 
+	
 	if ( sensors.size() == 0 ) {
 		log.error "No sensors found in search area"
 	} else {
 		if (sensors.size() == 1) {
-			sendEvent(name: "sites", value: sites, descriptionText: "AQI reported from site ${sites}")
+			sendEvent(name: "sites", value: sites, descriptionText: "AQI reported from site ${sites}", isStateChange: sendRepeatedEvents)
 		} else {
-			sendEvent(name: "sites", value: sites, descriptionText: "AQI is averaged from ${sensors.size()} sites ${sites}")
+			sendEvent(name: "sites", value: sites, descriptionText: "AQI is averaged from ${sensors.size()} sites ${sites}", isStateChange: sendRepeatedEvents)
 		}
-		sendEvent(name: "category", value: AQIcategory, descriptionText: "${device.displayName} category is ${AQIcategory}")
+		sendEvent(name: "category", value: AQIcategory, descriptionText: "${device.displayName} category is ${AQIcategory}", isStateChange: sendRepeatedEvents)
 		if (conversion) {
-			sendEvent(name: "conversion", value: conversion, descriptionText: "PM 2.5 AQI conversion algorithm is ${conversion}")
-			//sendEvent(name: "aqi", value: aqi2_5Value, unit: "PM 2.5 AQI (${conversion})", descriptionText: "${device.displayName} AQI level is ${aqi2_5Value}")
-			sendEvent(name: "aqi", value: aqi2_5Value, unit: "PM 2.5 AQI (${conversion})", descriptionText: "${AQIcategory}")
+			sendEvent(name: "conversion", value: conversion, descriptionText: "PM 2.5 AQI conversion algorithm is ${conversion}", isStateChange: sendRepeatedEvents)
+			//sendEvent(name: "aqi", value: aqi2_5Value, unit: "PM 2.5 AQI (${conversion})", descriptionText: "${device.displayName} AQI level is ${aqi2_5Value}", sendRepeatedEvents)
+			sendEvent(name: "aqi", value: aqi2_5Value, unit: "PM 2.5 AQI (${conversion})", descriptionText: "${AQIcategory}", isStateChange: sendRepeatedEvents)
 		} else {
-			//sendEvent(name: "aqi", value: aqi2_5Value, unit: "PM 2.5 AQI", descriptionText: "${device.displayName} AQI level is ${aqi2_5Value}")
-			sendEvent(name: "aqi", value: aqi2_5Value, unit: "PM 2.5 AQI", descriptionText: "${AQIcategory}")
+			//sendEvent(name: "aqi", value: aqi2_5Value, unit: "PM 2.5 AQI", descriptionText: "${device.displayName} AQI level is ${aqi2_5Value}", sendRepeatedEvents)
+			sendEvent(name: "aqi", value: aqi2_5Value, unit: "PM 2.5 AQI", descriptionText: "${AQIcategory}", isStateChange: sendRepeatedEvents)
 		}
 	}
 }
