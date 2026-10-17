@@ -4,7 +4,6 @@
  *  Copyright 2022 Peter Miller
  */
 
-#include hyposphere.net.plib
 import Math.*
 
 definition(
@@ -14,6 +13,7 @@ definition(
     author: "Peter Miller",
     description: "SeaWorld Fireworks notifier",
     category: "My Apps",
+	menu: "Integrations",
     iconUrl: "",
     iconX2Url: "",
     importUrl: ""
@@ -22,18 +22,21 @@ definition(
 preferences {
 	java.text.SimpleDateFormat df
 	
-	section() {
-		input "isPaused", "bool", title: "Pause app", defaultValue: false
-	}
-	if (state.todayShow) {
-		df = new java.text.SimpleDateFormat("EEEE, h:mm aa")
-		section("<b>Today's show</b>") {
-			paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + "${df.format(toDateTime(state.todayShow))}" + "</table>"
+	section("<b>Today's show</b>") {
+		if (state.todayShow) {
+			df = new java.text.SimpleDateFormat("EEEE, h:mm aa")
+			paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + "${state.todayShowType} @ ${df.format(toDateTime(state.todayShow))}" + "</table>"
+		} else {
+			paragraph 'none found'
 		}
 	}
 	section("<b>Last show</b>") {
-		df = new java.text.SimpleDateFormat("EEEE, d MMM yyyy h:mm aa");
-		paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + "${df.format(toDateTime(state.prevShow ?: "2008-08-08T20:08:08+0700"))}" + "</table>"
+		if (state.prevShow) {
+			df = new java.text.SimpleDateFormat("EEEE, d MMM yyyy h:mm aa");
+			paragraph '<table style="border:1px solid silver; border-collapse:collapse; width:100%;">' + "${state.prevShowType} @ ${df.format(toDateTime(state.prevShow))}" + "</table>"
+		} else {
+			paragraph 'none found'
+		}
 	}
 	section("<b>Settings</b>") {
 		//input "sourceURL", "text", title: "Source URL", required: true, description: "URL to JSON file", defaultValue: "https://www.seaworld.com/api/sitecore/Marquee/LoadDayData?itemId=a6ac339a-375c-461c-9540-faebba25b60c"
@@ -42,18 +45,14 @@ preferences {
 }
 
 void initialize() {
-	if (isPaused == false) {
-		resetAppLabel()
-		
-		//state.jsonFieldCount = state.jsonFieldCount ?: 0
-		unschedule("SiteCheck")
-		schedule('0 1 0 ? * *', "SiteCheck")
-	} else {
-		addAppLabel("Paused", "red")
-	}
+	state.jsonFieldCount = state.jsonFieldCount ?: 0
+	state.failCount = state.failCount ?: 0
+	schedule('0 9 0 ? * *', "SiteCheck")
 }
 
 def installed() {
+	resetAppLabel()
+	unschedule("SiteCheck")
 	initialize()
 }
 
@@ -67,7 +66,8 @@ def uninstalled() {
 }
 
 void SiteCheck() {
-	String baseURL = "https://www.seaworld.com/api/sitecore/Marquee/LoadDayData?itemId=a6ac339a-375c-461c-9540-faebba25b60c"
+	String baseURL = "https://seaworld.com/api/sitecore/CalendarEvents/LoadCalendarDayData?itemId=214cee71-fc4a-493b-aaee-18f19f6037f7&sc_site=seaworld-san-diego&sc_itemid=5a724094-08cf-4dd7-acf0-3c89493f724d"
+
 	java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("YYYY-MM-dd");
 	
 	String url = baseURL + "&date=" + df.format(timeToday("12:00"))
@@ -92,14 +92,10 @@ void SiteCheck() {
 }
 
 void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
-	List<Map> EventsData
-	Date FireworksTime
-	Integer fieldCount
-	String tzOffset = sprintf("%03d:00", (location.timeZone.getOffset(now())/(1000 * 60 * 60)).intValue())
-
     String respMimetype = ''
+	
     if (resp.getHeaders() && resp.getHeaders()["Content-Type"]) {
-    	respMimetype = resp.getHeaders()["Content-Type"].split(";")[0]
+    	respMimetype = resp.getHeaders()['Content-Type']?.toString()?.split(';')[0]?.split(' ')[1]
 	}
 
 	if (resp.getStatus() != 200 || respMimetype != "application/json") {
@@ -107,29 +103,56 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 			log.error "Response type '${respMimetype}', JSON expected"
 		}
 		log.error "HTTP error: " + resp.getStatus()
+		state.failCount++
+		if (state.failCount == 2) {
+			notifyDevice.deviceNotification 'SeaWorld schedule down!'
+		}
 		return
+	} else {
+		if (state.failCount > 0) {
+			state.failCount = 0
+			if (state.failCount > 1) {
+				notifyDevice.deviceNotification 'SeaWorld schedule restored'
+			}
+		}
 	}
 	
-	EventsData = resp.getJson().EventGroups
-	EventsData.each { if (it.Events[0].Title.toLowerCase().indexOf("firework") >= 0) {FireworksTime = toDateTime(it.Events[0].StartTime + tzOffset)} }
-	if (FireworksTime) {
-		state.prevShow = state.todayShow
-		state.todayShow = FireworksTime
+	List<Map> EventsData
+	Date showTime
+	String showType
+	Integer fieldCount
+	String tzOffset = sprintf("%03d:00", (location.timeZone.getOffset(now())/(1000 * 60 * 60)).intValue())
+
+	EventsData = resp.getJson().events
+	
+	EventsData.each { if (it.title.toLowerCase().indexOf("firework") >= 0) { showTime = toDateTime(it.start + tzOffset); showType = "fireworks"} }
+	if (! showTime) {
+		EventsData.each { if (it.title.toLowerCase().indexOf("drone") >= 0) { showTime = toDateTime(it.start + tzOffset); showType = "drone show"} }
+	}
+	if (showTime) {
+		if (showTime != state.todayShow) {
+			state.prevShow = state.todayShow
+			state.prevShowType = state.todayShowType
+			state.todayShow = showTime
+			state.todayShowType = showType
+			//log.debug "todayShow set: ${state.todayShow}"
+			//log.debug "prevShow set: ${state.prevShow}"
 		
-		/***/
-		Calendar c = Calendar.getInstance()
-		c.setTime(FireworksTime)
-		c.add(Calendar.MINUTE, -60)
-		runOnce(c.getTime(), "sendNotice")
-		/***
-		FireworksTime[Calendar.MINUTE] = FireworksTime[Calendar.MINUTE] - 60
-		runOnce(FireworksTime, "sendNotice")
-		/***/
+			/***/
+			Calendar c = Calendar.getInstance()
+			c.setTime(showTime)
+			c.add(Calendar.MINUTE, -60)
+			runOnce(c.getTime(), "sendNotice")
+			/***
+			showTime[Calendar.MINUTE] = showTime[Calendar.MINUTE] - 60
+			runOnce(showTime, "sendNotice")
+			/***/
 		
-		//log.info "Notify at ${c.getTime()}"
+			//log.info "Notify at ${c.getTime()}"
+		}
 	} else {
 		state.todayShow = ""
-		//log.info "No fireworks"
+		//log.info "No shows"
 	}
 	
 	fieldCount = resp.getJson().size()
@@ -144,5 +167,5 @@ void sendNotice() {
 	
 	String showTime = df.format(toDateTime(state.todayShow))
     
-    notifyDevice.deviceNotification "SeaWorld fireworks at ${showTime}"
+	notifyDevice.deviceNotification "SeaWorld ${state.todayShowType} at ${showTime}"
 }
