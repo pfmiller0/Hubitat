@@ -12,11 +12,19 @@ definition(
 	parent: "hyposphere.net:P's Utilities",
 	author: "Peter Miller",
 	description: "Retrieve SDFD incidents, and provide notification for local incidents.",
-	menu: "apps",
+	menu: "Integrations",
 	iconUrl: "",
 	iconX2Url: "",
 	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/SDFD%20Incident%20Notifier.groovy"
 )
+
+String DISPATCH_URL() { 'https://webapps.sandiego.gov/sdfiredispatch' }
+List<String> ALWAYS_NOTIFY_TYPES() { ["Alert 2", "Alert 3", "Alert 2 Brown/Mont", "Alert 3 Brown/Mont", "ASHER [Active Shooter]", "Boat Fire", "Boat Fire 1st Alm", "Ship Fire (Cruise/USS)"] }
+List<String> IGNORE_INC() { ["Medical", "C2C - CHECK COMMENTS (RCIP)", "CAD Test", "Carbon Monoxide Alarm", "DMS", "Duty Mechanic", "Elevator Rescue", "Facilities", "Fire System Service", "Lift Assist", "Lock in/out", "Logistics", "Medical Alert Alarm", "Move Up", "Page", "RAP", "Ringing Alarm", "Special Service", "STAND BACK HOLD", "Truck - Special Service", "yGT General Transport", "Water Rescue 1 & 0"] }
+//Add redundant: Natural Gas Odor - Outside [.Natural Gas Odor - Outside], Natural Gas Leak/Odor-Inside [.Natural Gas Leak/Odor-Inside], Structure High/Wide Rise [Structure Highrise/Hospital], AID - MEDIC [Mutual Aid Out of City Request], Assist PD - Jumper [Mutual Aid Out of City Request], Ringing Alarm Highrise [Ringng Alarm Highrise], Ship Fire (Cruise/USS) [Ship Fire (USS/Cruise)]
+List<String> REDUNDANT_TYPES() { [ ".Confined Space/Trench Rescue", "1a Medical Aid 1a", "Advised Incident (misc.)", "Alert 1", "Alert 2 Brn/Mont", "Alert 2 Still Alarm", "Fuel in Bilge", "Gaslamp", "Hazmat", "Medical Aid O", "MTZ - Vegetaton Inital Attack", "Medical Multi-casualty", "Nat Gas Leak BB", "Nat Gas SING ENG SDGE", "Pump Truck", "Rescue", "Ringng Alarm Highrise", "Ship Fire (Cruise/USS)", "Single Engine Response", "Single Resource", "Structure Commercial", "Traffic Accident Freeway (NC)", "Traffic Accidents", "TwoEngines", "Vegetation NO Special Response", "Vehicle vs. Structure"] }
+List<String> NO_NOTIFICATION_TYPES() { ["Extinguished Fire", "Natural Gas Leak/Odor-Inside", "Ringing Alarm Highrise", "Traffic Accident FWY", "Traffic Accident (L1)", "Vehicle Fire Freeway"] }
+List<String> AMBULANCE_UNITS() { ["BLS", "EMSDO", "M", "SDGE"] }
 
 preferences {
 	if (state.activeIncidents != null) {
@@ -29,13 +37,13 @@ preferences {
 			} else {
 				paragraph "<p align='center'>No active incidents</p>"
 			}
-			paragraph "<p align='right' style='font-size:90%;'><a href='/installedapp/events/${app.id}'>Incident history</a></p>"
+			paragraph "<p align='right' style='font-size:90%;'>[<a target='_blank' href='${DISPATCH_URL()}'>SDFD Dispatch</a>] [<a target='_blank' href='/installedapp/events/${app.id}'>Incident history</a>]</p>"
 		}
 	}
 	section("<b>Notifications</b>") {
 		input "notifyDevice", "capability.notification", title: "Notification device", multiple: false, required: false
-		input "notifyDist", "decimal", title: "Notification distance", defaultValue: 1, required: true, width: 6
-		input "notifyUnits", "string", title: "Notification unit (if distance is unknown)", width: 6
+		input "notifyDist", "decimal", title: "Distance", defaultValue: 1, required: true, width: 6
+		input "notifyUnits", "string", title: "Units, if distance is unknown (comma delimited)", width: 6
 	}
 	section("<b>Queries</b>") {
 		input "update_interval", "number", title: "Update frequency (mins)", defaultValue: 5, required: true
@@ -45,13 +53,6 @@ preferences {
 		input "debugMode", "bool", title: "Enable debug logging", defaultValue: false
 	}
 }
-
-List<String> ALWAYS_NOTIFY_TYPES() { ["ASHER [Active Shooter]", "Boat Fire", "Boat Fire 1st Alm", "Ship Fire (Cruise/USS)"] }
-List<String> IGNORE_INC() { ["Medical", "C2C - CHECK COMMENTS (RCIP)", "CAD Test", "Carbon Monoxide Alarm", "DMS", "Duty Mechanic", "Elevator Rescue", "Facilities", "Lift Assist", "Lock in/out", "Logistics", "Medical Alert Alarm", "Move Up", "Page", "RAP", "Ringing Alarm", "Special Service", "STAND BACK HOLD", "Truck - Special Service",
-							 "yGT General Transport", "Water Rescue 1 & 0"] }
-List<String> REDUNDANT_TYPES() { ["1a Medical Aid 1a", "Advised Incident (misc.)", "Alert 1", "Alert 2 Brn/Mont", "Alert 2 Still Alarm", "Fuel in Bilge", "Gaslamp", "Hazmat", "Medical Aid O", "MTZ - Vegetaton Inital Attack", "Medical Multi-casualty", "Nat Gas Leak BB", "Nat Gas SING ENG SDGE", "Pump Truck", "Rescue", "Ship Fire (Cruise/USS)", "Single Engine Response", "Single Resource", "Structure Commercial", "Traffic Accident Freeway (NC)", "Traffic Accidents", "TwoEngines", "Vegetation NO Special Response", "Vehicle vs. Structure"] }
-List<String> NO_NOTIFICATION_TYPES() { ["Extinguished Fire", "Ringing Alarm Highrise", "Traffic Accident FWY", "Traffic Accident (L1)", "Vehicle Fire Freeway"] }
-List<String> AMBULANCE_UNITS() { ["M", "BLS", "SDGE"] }
 
 void INCIDENT_UNIT_CHECK(List<Map> incidents) {
 	inc_types= ["yGT General Transport"]
@@ -107,7 +108,7 @@ def uninstalled() {
 }
 
 void incidentCheck() {
-	String url="https://webapps.sandiego.gov/SDFireDispatch/api/v1/Incidents?_=" + now()
+	String url = DISPATCH_URL() +'/api/v1/Incidents?_=' + now()
 
     Map params = [
 	    uri: url,
@@ -138,7 +139,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
     
     String respMimetype = ''
     if (resp.getHeaders() && resp.getHeaders()["Content-Type"]) {
-    	respMimetype = resp.getHeaders()["Content-Type"].split(";")[0]
+		respMimetype = resp.getHeaders()['Content-Type']?.toString()?.split(';')[0]?.split(' ')[1]
 	}
 
 	/***** Backoff on error *****/
@@ -216,7 +217,7 @@ void httpResponse(hubitat.scheduling.AsyncResponse resp, Map data) {
 		// Get incidents for notification
 		newIncidents = filterIncidentType(newIncidents, NO_NOTIFICATION_TYPES())
 		// TODO: Don't filter ALWAYS_NOTIFY_TYPES
-		newIncidents = getLocalIncidents(newIncidents, notifyUnits, ALWAYS_NOTIFY_TYPES())
+		newIncidents = getLocalIncidents(newIncidents, notifyUnits.tokenize(","), ALWAYS_NOTIFY_TYPES())
 		
 		if (newIncidents && notifyDevice) notifyDevice.deviceNotification incidentsToStr(newIncidents, "MIN")	
 	}
@@ -233,16 +234,16 @@ List<Map> filterIncidentType(List<Map> incidents, List<String> types) {
 List<Map> filterMedIncidents(List<Map> incidents, List<String> medUnits) {	
 	String unit_regexp = ""
 	
-	AMBULANCE_UNITS().every { if (unit_regexp) unit_regexp += "|"; unit_regexp +=  '(^' + it + '[0-9]+$)'}
+	AMBULANCE_UNITS().every { if (unit_regexp) unit_regexp += "|"; unit_regexp +=  '(^' + it + '[0-9]*$)'}
 	
 	return incidents.findAll { inc -> !inc.Units.every {it =~ unit_regexp } }
 }
 
-boolean unitCalled(Map<String, List> incident, String unit) {
-	return incident.Units.any { it == unit }
+boolean unitCalled(Map<String, List> incidents, List<String> units) {
+	return incidents.Units.any { incUnit -> units.any {locUnit -> incUnit == locUnit }}
 }
 
-List<Map> getLocalIncidents(List<Map> incidents, String localUnit, List<String> always_notify_types) {
+List<Map> getLocalIncidents(List<Map> incidents, List<String> localUnits, List<String> always_notify_types) {
 	return incidents.findAll { inc ->
 		if (always_notify_types.any {type -> type == inc.CallType }) {
 			log.debug("Forced notify: ${inc.CallType}")
@@ -251,7 +252,7 @@ List<Map> getLocalIncidents(List<Map> incidents, String localUnit, List<String> 
 		if (inc.DistMiles) {
 			return inc.DistMiles < notifyDist
 		} else {
-			return unitCalled(inc, localUnit)
+			return unitCalled(inc, localUnits)
 		}
 	}
 }
@@ -262,21 +263,32 @@ List<Map> getNewIncidents(List<Map> allIncidents, List<Map> activeIncidents) {
 	}
 }
 
+String generateIncidentKey(Date incDate, String CallType) {
+	String key = "FD${incDate.getTime()/1000}_${CallType.replaceAll(/[^A-Za-z0-9]/, '')}"
+	//log.debug "key: ${key} (${CallType})"
+
+	return key
+}
+
 List<Map> cleanupList(List<Map> incidents) {
 	List<Map> cleanInc = []
 	
 	incidents.each { inc ->
 		// Drop incidents with no units or IncidentNumber
-		if (inc.Units.size > 0 && inc.MasterIncidentNumber != "") {
+		//log.debug("Rawinc: ${inc}")
+		//log.debug "date: " + inc.ResponseDateString
+		if (inc.UnitName && inc.MasterIncidentNumber != "") {
 			if ( ! cleanInc.any { it.IncidentNumber == inc.MasterIncidentNumber } ) {
 				// Decimal seconds in "2022-07-22T11:59:20.68-07:00" causes errors, so strip that out for ResponseDate. Normalize address case.
-				cleanInc << [IncidentNumber: inc.MasterIncidentNumber, ResponseDate: inc.ResponseDate.replaceAll('\\.[0-9]{2}-', '-'), CallType: inc.CallType.replaceFirst(/^\./, ''), IncidentTypeName: inc.IncidentTypeName, Address: toTitleCase(inc.Address), CrossStreet: toTitleCase(inc.CrossStreet), lat: null, lng: null, DistMiles: null, Units: inc.Units*.Code.sort(), UnitsTotal: inc.Units*.Code.sort()]
+				Date incDate = new Date().parse("yyy-M-d H:m", inc.ResponseDateString)
+				cleanInc << [IncidentNumber: generateIncidentKey(incDate, inc.CallType), ResponseDate: incDate, CallType: inc.CallType.replaceFirst(/^\./, ''), IncidentTypeName: inc.CallType, Address: toTitleCase(inc.Address), CrossStreet: toTitleCase(inc.CrossStreet), lat: null, lng: null, DistMiles: null, Units: inc.UnitName.tokenize(", ").sort(), UnitsTotal: inc.UnitName.tokenize(", ").sort()]
 			} else { 
 				log.info "Dropping duplicate incident #${inc.MasterIncidentNumber}"
 			}
 		}
 	}
 	
+	//log.debug "cleanInc: ${cleanInc}"
 	//log.debug "size: ${incidents.size()}, clean: ${cleanInc.size()}"	
 	return cleanInc
 }
@@ -373,7 +385,7 @@ void logIncidents(List<Map> incidents, String LogType) {
 		
 		if (LogType == "NEW") {
 			java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("HH:mm")
-			incTime = "REC: " + df.format(toDateTime(inc.ResponseDate))
+			incTime = "REC: " + df.format(inc.ResponseDate)
 			
 			incDesc = "${url}${address}${url ? "</a>" : ""}${incDistance}:<br>"
 			inc.Units.each {
@@ -427,7 +439,7 @@ String incidentToStr(Map<String, List> inc, String format) {
 		String incTime
 		String url = getGMapsLink(inc.lat, inc.lng)
 
-		incMins = getIncidentMinutes(inc.ResponseDate)
+		incMins = getIncidentMinutes(toDateTime(inc.ResponseDate))
 		incTime = sprintf('%d:%02d',(Integer) Math.floor(incMins / 60) ,incMins % 60)
 		
 		String td = '<td style="border:1px solid silver;">'
@@ -460,8 +472,16 @@ String incidentsToStr(List<Map> incidents, String format) {
 	return out
 }
 
+//Integer getIncidentMinutes(String responseDate) {
+//	return (now() - toDateTime(responseDate).getTime()) / (1000 * 60)
+//}
+
+Integer getIncidentMinutes(Date responseDate) {
+	return (now() - responseDate.getTime()) / (1000 * 60)
+}
+
 Integer getIncidentMinutes(String responseDate) {
-	return  ((now() - toDateTime(responseDate).getTime()) / (1000 * 60))
+	return (now() - toDateTime(responseDate).getTime()) / (1000 * 60)
 }
 
 String getGMapsLink (Float lat, Float lng) {
