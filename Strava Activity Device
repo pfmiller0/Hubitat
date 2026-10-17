@@ -20,6 +20,7 @@ definition(
 	namespace: "hyposphere.net",
 	author: "Peter Miller",
 	description: "Create a virtual device for Strava Activity information",
+	menu: "Integrations",
 	iconUrl: "",
 	iconX2Url: "",
 	importUrl: "https://raw.githubusercontent.com/pfmiller0/Hubitat/main/Strava%20Activity%20Device.groovy"
@@ -103,7 +104,7 @@ void presenceChanged(evt) {
 		schedule('20 * * ? * *', 'getNewActivities')
 	} else {
 		unschedule('getNewActivities')
-		runIn(300, 'getNewActivities') // Schedule one last check
+		runIn(60*20, 'getNewActivities') // Schedule one last check
 	}
 }
 
@@ -122,7 +123,7 @@ void getAuthLink() {
 		section {
 			href(
 				name	: 'authHref',
-				title	  : 'Auth Link',
+				title	: 'Auth Link',
 				url		: buildAuthUrl(),
 				description: 'Click this link to authorize with your Strava account'
 			)
@@ -263,7 +264,7 @@ void getNewActivities() {
 	// If "not present" for greater than 2 hours, revert to one query per hour
 	if ( (minsAway != 0 && minsAway <= 120) || (minsAway > 120 && minsAway % 60 == 0) ) {
 		Integer timeNow = (Integer) Math.floor(now() / 1000)
-        log.info "minsAway == $minsAway"
+        if (debug) log.debug "minsAway == $minsAway"
 		if (state.lastActivityTime) {
 			/***/
 			getActivities(state.lastActivityTime, timeNow, "new")
@@ -292,7 +293,7 @@ void getActivities(Integer after_time, Integer before_time, String query_type) {
 		page:		1
 	]
 	
-	log.info("Querying Strava for runs (${after_time - 1671000000}, ${before_time - 1671000000})")
+	if (debug) log.debug("Querying Strava for runs (${after_time - 1671000000}, ${before_time - 1671000000})")
 	Map params = [ uri: uri, headers: headers, contentType: contentType, query: query ]
 	asynchttpGet('handleGetActivities', params, [query_type: query_type, time: before_time, after_time: after_time])
 }
@@ -303,7 +304,7 @@ void handleGetActivities(resp, data) {
 	
     String respMimetype = ''
     if (resp.getHeaders() && resp.getHeaders()["Content-Type"]) {
-    	respMimetype = resp.getHeaders()["Content-Type"].split(";")[0]
+    	respMimetype = resp.getHeaders()['Content-Type']?.toString()?.split(';')[0]?.split(' ')[1]
 	}
 	
 	if (resp.hasError() || respMimetype != "application/json" ) {
@@ -311,8 +312,18 @@ void handleGetActivities(resp, data) {
             log.error "Response type '${respMimetype}', JSON expected"
         }
 		log.error("Error code: $respCode")
+		if (respCode == "401") {
+		    log.error("Error code: $respCode (auth error, log in again)")
+        } else {
+	    	log.error("Error code: $respCode")
+        }
 		try {
-			log.error(resp.getErrorData())
+			def e = resp.getErrorData().errors
+			if (e[0].field == "access_token" && e[0].code == "invalid") {
+				log.error "Invalid access token!"
+			} else {
+				log.error "Unknown auth error: $e"
+			}
 		} catch (Exception ignored) {
 		//	no response body
 		}
@@ -363,10 +374,13 @@ void handleGetActivities(resp, data) {
 			log.info "Past ${data.query_type}: ${total_runs} runs, ${printTime(total_time)} (${meters2miles(total_dist)} miles)"
 		} else if (data.query_type == "export") {
 			if (activities) {
+				/*
 				runtimes = []
 				activities.each {
 					runtimes << sprintf("%d:%2d", it.start_date[Calendar.HOUR_OF_DAY], it.start_date[Calendar.MINUTE])
 				}
+				*/
+				runtimes = activities.collect { sprintf("%d:%2d", it.start_date[Calendar.HOUR_OF_DAY], it.start_date[Calendar.MINUTE]) }
 				log.debug runtimes
 			}
 		} else {
@@ -516,3 +530,4 @@ BigDecimal meters2miles (BigDecimal m) {
 BigDecimal roundoff(BigDecimal n) {
 	// BigDecimal.round(i) available in newer groovy
 	return Math.round(n*100)/100
+}
